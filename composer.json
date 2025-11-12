@@ -1,0 +1,36 @@
+{
+    "name": "b2brouter/woocommerce-plugin",
+    "description": "B2Brouter for WooCommerce - Generate and send electronic invoices from WooCommerce orders",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "authors": [
+        {
+            "name": "B2Brouter",
+            "email": "info@b2brouter.com"
+        }
+    ],
+    "require": {
+        "php": ">=7.4",
+        "jtorrents/b2b-php": "^1.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "B2Brouter\\WooCommerce\\": "includes/"
+        }
+    },
+    "scripts": {
+        "post-install-cmd": [
+            "@php -r \"echo 'B2Brouter PHP SDK installed successfully.\\n';\""
+        ],
+        "post-update-cmd": [
+            "@php -r \"echo 'B2Brouter PHP SDK updated successfully.\\n';\""
+        ]
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "preferred-install": "dist",
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
