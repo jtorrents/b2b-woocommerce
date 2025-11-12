@@ -44,7 +44,7 @@ composer require b2brouter/woocommerce-plugin
 
 ### 1. Get Your API Key
 
-1. Visit [B2Brouter eDocExchange](https://b2brouter.com/edocexchange)
+1. Visit [B2Brouter](https://app.b2brouter.net)
 2. If you're a new user, complete the registration process
 3. If you're an existing user, log in to your account
 4. Activate your eDocExchange subscription
@@ -102,7 +102,7 @@ Advanced settings like transports, formats, taxes, and compliance rules are conf
 To access advanced settings:
 
 1. Click **Access B2Brouter Account Settings** in the plugin settings page
-2. Or visit [B2Brouter Account](https://b2brouter.com/account) directly
+2. Or visit [B2Brouter Account](https://app.b2brouter.net) directly
 
 ## Invoice Data
 
@@ -206,8 +206,8 @@ $invoices = $client->invoices->all(['limit' => 1]);
 
 ## Support
 
-- **Documentation**: [B2Brouter Documentation](https://b2brouter.com/docs)
-- **Support**: [B2Brouter Support](https://b2brouter.com/support)
+- **Documentation**: [B2Brouter API Documentation](https://developer.b2brouter.net)
+- **B2Brouter**: [B2Brouter](https://app.b2brouter.net)
 - **GitHub Issues**: [Report Issues](https://github.com/jtorrents/b2b-woocommerce/issues)
 
 ## Changelog
@@ -225,7 +225,7 @@ $invoices = $client->invoices->all(['limit' => 1]);
 
 ## License
 
-This plugin is licensed under the GPL v2 or later.
+This library is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ## Credits
 
