@@ -5,9 +5,9 @@
  * Description: Generate and send electronic invoices from WooCommerce orders using B2Brouter
  * Version: 1.0.0
  * Author: B2Brouter
- * Author URI: https://b2brouter.com
- * License: GPL v2 or later
- * License URI: https://www.gnu.org/licenses/gpl-2.0.html
+ * Author URI: https://b2brouter.net
+ * License: MIT
+ * License URI: https://opensource.org/license/mit
  * Text Domain: b2brouter-woocommerce
  * Domain Path: /languages
  * Requires at least: 5.8
