@@ -210,26 +210,13 @@ $invoices = $client->invoices->all(['limit' => 1]);
 - **B2Brouter**: [B2Brouter](https://app.b2brouter.net)
 - **GitHub Issues**: [Report Issues](https://github.com/jtorrents/b2b-woocommerce/issues)
 
-## Changelog
-
-### 1.0.0 - 2025-01-XX
-
-- Initial release
-- Automatic and manual invoice generation
-- API key authentication
-- Transaction counter
-- Admin bar integration
-- Bulk invoice generation
-- WooCommerce orders integration
-- B2Brouter PHP SDK integration
-
 ## License
 
 This library is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ## Credits
 
-- Developed by [B2Brouter](https://b2brouter.com)
+- Developed by [B2Brouter](https://b2brouter.net)
 - Uses the [B2Brouter PHP SDK](https://github.com/jtorrents/b2b-php)
 - Built for [WooCommerce](https://woocommerce.com)
 
