@@ -14,6 +14,8 @@
  * Requires PHP: 7.4
  * WC requires at least: 5.0
  * WC tested up to: 8.5
+ *
+ * @package B2Brouter\WooCommerce
  */
 
 // Exit if accessed directly
@@ -44,17 +46,32 @@ if (file_exists(B2BROUTER_WC_PLUGIN_DIR . 'vendor/autoload.php')) {
 
 /**
  * Main Plugin Class
+ *
+ * @since 1.0.0
  */
 class B2Brouter_WooCommerce {
 
     /**
      * Instance of this class
+     *
+     * @since 1.0.0
      * @var B2Brouter_WooCommerce
      */
     private static $instance = null;
 
     /**
+     * Dependency container
+     *
+     * @since 1.0.0
+     * @var array
+     */
+    private $container = array();
+
+    /**
      * Get instance
+     *
+     * @since 1.0.0
+     * @return B2Brouter_WooCommerce
      */
     public static function get_instance() {
         if (null === self::$instance) {
@@ -65,6 +82,8 @@ class B2Brouter_WooCommerce {
 
     /**
      * Constructor
+     *
+     * @since 1.0.0
      */
     private function __construct() {
         $this->init();
@@ -72,45 +91,97 @@ class B2Brouter_WooCommerce {
 
     /**
      * Initialize plugin
+     *
+     * @since 1.0.0
+     * @return void
      */
     private function init() {
-        // Load plugin classes
-        $this->load_dependencies();
-
         // Plugin activation/deactivation hooks
         register_activation_hook(__FILE__, array($this, 'activate'));
         register_deactivation_hook(__FILE__, array($this, 'deactivate'));
 
         // Initialize hooks
         add_action('plugins_loaded', array($this, 'load_textdomain'));
-        add_action('init', array($this, 'init_hooks'));
+        add_action('init', array($this, 'init_plugin'));
     }
 
     /**
-     * Load plugin dependencies
+     * Initialize plugin dependencies and classes
+     *
+     * @since 1.0.0
+     * @return void
      */
-    private function load_dependencies() {
-        // Core classes
-        require_once B2BROUTER_WC_PLUGIN_DIR . 'includes/class-b2brouter-settings.php';
-        require_once B2BROUTER_WC_PLUGIN_DIR . 'includes/class-b2brouter-invoice-generator.php';
-        require_once B2BROUTER_WC_PLUGIN_DIR . 'includes/class-b2brouter-admin.php';
-        require_once B2BROUTER_WC_PLUGIN_DIR . 'includes/class-b2brouter-order-handler.php';
+    public function init_plugin() {
+        // Initialize dependency container
+        $this->init_container();
 
         // Initialize classes
-        B2Brouter_Settings::get_instance();
-        B2Brouter_Admin::get_instance();
-        B2Brouter_Order_Handler::get_instance();
+        $this->container['settings'];
+        $this->container['admin'];
+        $this->container['order_handler'];
     }
 
     /**
-     * Initialize hooks
+     * Initialize dependency injection container
+     *
+     * @since 1.0.0
+     * @return void
      */
-    public function init_hooks() {
-        // Add any initialization hooks here
+    private function init_container() {
+        // Register Settings (no dependencies)
+        $this->container['settings'] = function() {
+            return new \B2Brouter\WooCommerce\Settings();
+        };
+
+        // Register Invoice_Generator (depends on Settings)
+        $this->container['invoice_generator'] = function() {
+            return new \B2Brouter\WooCommerce\Invoice_Generator(
+                $this->get('settings')
+            );
+        };
+
+        // Register Admin (depends on Settings and Invoice_Generator)
+        $this->container['admin'] = function() {
+            return new \B2Brouter\WooCommerce\Admin(
+                $this->get('settings'),
+                $this->get('invoice_generator')
+            );
+        };
+
+        // Register Order_Handler (depends on Settings and Invoice_Generator)
+        $this->container['order_handler'] = function() {
+            return new \B2Brouter\WooCommerce\Order_Handler(
+                $this->get('settings'),
+                $this->get('invoice_generator')
+            );
+        };
+    }
+
+    /**
+     * Get service from container
+     *
+     * @since 1.0.0
+     * @param string $key Service key
+     * @return mixed Service instance
+     */
+    private function get($key) {
+        if (!isset($this->container[$key])) {
+            throw new \Exception("Service '{$key}' not found in container.");
+        }
+
+        // If it's a callable, execute it once and cache the result
+        if (is_callable($this->container[$key])) {
+            $this->container[$key] = call_user_func($this->container[$key]);
+        }
+
+        return $this->container[$key];
     }
 
     /**
      * Load plugin textdomain
+     *
+     * @since 1.0.0
+     * @return void
      */
     public function load_textdomain() {
         load_plugin_textdomain(
@@ -122,6 +193,9 @@ class B2Brouter_WooCommerce {
 
     /**
      * Plugin activation
+     *
+     * @since 1.0.0
+     * @return void
      */
     public function activate() {
         // Set default options
@@ -138,6 +212,9 @@ class B2Brouter_WooCommerce {
 
     /**
      * Plugin deactivation
+     *
+     * @since 1.0.0
+     * @return void
      */
     public function deactivate() {
         // Clean up if needed

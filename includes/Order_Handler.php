@@ -1,24 +1,53 @@
 <?php
 /**
  * WooCommerce Order Handler
+ *
+ * @package B2Brouter\WooCommerce
+ * @since 1.0.0
  */
+
+namespace B2Brouter\WooCommerce;
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
-class B2Brouter_Order_Handler {
+/**
+ * Order_Handler class
+ *
+ * Handles WooCommerce order integration and invoice generation triggers
+ *
+ * @since 1.0.0
+ */
+class Order_Handler {
 
-    private static $instance = null;
+    /**
+     * Settings instance
+     *
+     * @since 1.0.0
+     * @var Settings
+     */
+    private $settings;
 
-    public static function get_instance() {
-        if (null === self::$instance) {
-            self::$instance = new self();
-        }
-        return self::$instance;
-    }
+    /**
+     * Invoice Generator instance
+     *
+     * @since 1.0.0
+     * @var Invoice_Generator
+     */
+    private $invoice_generator;
 
-    private function __construct() {
+    /**
+     * Constructor
+     *
+     * @since 1.0.0
+     * @param Settings $settings Settings instance
+     * @param Invoice_Generator $invoice_generator Invoice generator instance
+     */
+    public function __construct(Settings $settings, Invoice_Generator $invoice_generator) {
+        $this->settings = $settings;
+        $this->invoice_generator = $invoice_generator;
+
         // Automatic invoice generation on order completed
         add_action('woocommerce_order_status_completed', array($this, 'maybe_generate_invoice_automatic'));
 
@@ -37,32 +66,36 @@ class B2Brouter_Order_Handler {
 
     /**
      * Maybe generate invoice automatically
+     *
+     * @since 1.0.0
+     * @param int $order_id The order ID
+     * @return void
      */
     public function maybe_generate_invoice_automatic($order_id) {
-        $settings = B2Brouter_Settings::get_instance();
-
         // Check if automatic mode is enabled
-        if ($settings->get_invoice_mode() !== 'automatic') {
+        if ($this->settings->get_invoice_mode() !== 'automatic') {
             return;
         }
 
         // Check if API key is configured
-        if (!$settings->is_api_key_configured()) {
+        if (!$this->settings->is_api_key_configured()) {
             return;
         }
 
         // Check if invoice already exists
-        $generator = B2Brouter_Invoice_Generator::get_instance();
-        if ($generator->has_invoice($order_id)) {
+        if ($this->invoice_generator->has_invoice($order_id)) {
             return;
         }
 
         // Generate invoice
-        $generator->generate_invoice($order_id);
+        $this->invoice_generator->generate_invoice($order_id);
     }
 
     /**
      * Add invoice meta box to order admin
+     *
+     * @since 1.0.0
+     * @return void
      */
     public function add_invoice_meta_box() {
         add_meta_box(
@@ -90,16 +123,17 @@ class B2Brouter_Order_Handler {
 
     /**
      * Render invoice meta box
+     *
+     * @since 1.0.0
+     * @param \WP_Post|\WC_Order $post_or_order Post or order object
+     * @return void
      */
     public function render_invoice_meta_box($post_or_order) {
-        $order = $post_or_order instanceof WC_Order ? $post_or_order : wc_get_order($post_or_order->ID);
+        $order = $post_or_order instanceof \WC_Order ? $post_or_order : wc_get_order($post_or_order->ID);
         $order_id = $order->get_id();
 
-        $settings = B2Brouter_Settings::get_instance();
-        $generator = B2Brouter_Invoice_Generator::get_instance();
-
-        $has_invoice = $generator->has_invoice($order_id);
-        $invoice_id = $generator->get_invoice_id($order_id);
+        $has_invoice = $this->invoice_generator->has_invoice($order_id);
+        $invoice_id = $this->invoice_generator->get_invoice_id($order_id);
 
         ?>
         <div class="b2brouter-invoice-meta-box">
@@ -126,7 +160,7 @@ class B2Brouter_Order_Handler {
                     <?php esc_html_e('Invoice Not Generated', 'b2brouter-woocommerce'); ?>
                 </p>
 
-                <?php if (!$settings->is_api_key_configured()): ?>
+                <?php if (!$this->settings->is_api_key_configured()): ?>
                     <p class="description">
                         <?php esc_html_e('API key not configured.', 'b2brouter-woocommerce'); ?>
                         <a href="<?php echo esc_url(admin_url('admin.php?page=b2brouter')); ?>">
@@ -158,6 +192,10 @@ class B2Brouter_Order_Handler {
 
     /**
      * Add invoice column to orders list
+     *
+     * @since 1.0.0
+     * @param array $columns Existing columns
+     * @return array Modified columns
      */
     public function add_invoice_column($columns) {
         $new_columns = array();
@@ -176,6 +214,11 @@ class B2Brouter_Order_Handler {
 
     /**
      * Render invoice column
+     *
+     * @since 1.0.0
+     * @param string $column Column name
+     * @param int $post_id Post ID
+     * @return void
      */
     public function render_invoice_column($column, $post_id) {
         if ($column !== 'b2brouter_invoice') {
@@ -187,8 +230,7 @@ class B2Brouter_Order_Handler {
             return;
         }
 
-        $generator = B2Brouter_Invoice_Generator::get_instance();
-        $has_invoice = $generator->has_invoice($post_id);
+        $has_invoice = $this->invoice_generator->has_invoice($post_id);
 
         if ($has_invoice) {
             echo '<span class="dashicons dashicons-yes-alt" style="color: #46b450;" title="' . esc_attr__('Invoice generated', 'b2brouter-woocommerce') . '"></span>';
@@ -199,6 +241,10 @@ class B2Brouter_Order_Handler {
 
     /**
      * Add bulk action
+     *
+     * @since 1.0.0
+     * @param array $actions Existing bulk actions
+     * @return array Modified bulk actions
      */
     public function add_bulk_action($actions) {
         $actions['b2brouter_generate_invoices'] = __('Generate B2Brouter Invoices', 'b2brouter-woocommerce');
@@ -207,18 +253,23 @@ class B2Brouter_Order_Handler {
 
     /**
      * Handle bulk action
+     *
+     * @since 1.0.0
+     * @param string $redirect_to Redirect URL
+     * @param string $action Action name
+     * @param array $post_ids Post IDs
+     * @return string Modified redirect URL
      */
     public function handle_bulk_action($redirect_to, $action, $post_ids) {
         if ($action !== 'b2brouter_generate_invoices') {
             return $redirect_to;
         }
 
-        $generator = B2Brouter_Invoice_Generator::get_instance();
         $success_count = 0;
         $error_count = 0;
 
         foreach ($post_ids as $post_id) {
-            $result = $generator->generate_invoice($post_id);
+            $result = $this->invoice_generator->generate_invoice($post_id);
             if ($result['success']) {
                 $success_count++;
             } else {
@@ -236,6 +287,9 @@ class B2Brouter_Order_Handler {
 
     /**
      * Show bulk action notices
+     *
+     * @since 1.0.0
+     * @return void
      */
     public function bulk_action_notices() {
         if (!isset($_GET['b2brouter_bulk_success']) && !isset($_GET['b2brouter_bulk_error'])) {

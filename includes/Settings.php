@@ -1,15 +1,25 @@
 <?php
 /**
  * Settings Handler
+ *
+ * @package B2Brouter\WooCommerce
+ * @since 1.0.0
  */
+
+namespace B2Brouter\WooCommerce;
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
-class B2Brouter_Settings {
-
-    private static $instance = null;
+/**
+ * Settings class
+ *
+ * Handles all plugin settings and API key management
+ *
+ * @since 1.0.0
+ */
+class Settings {
 
     const OPTION_API_KEY = 'b2brouter_api_key';
     const OPTION_INVOICE_MODE = 'b2brouter_invoice_mode';
@@ -17,19 +27,20 @@ class B2Brouter_Settings {
     const OPTION_SHOW_WELCOME = 'b2brouter_show_welcome';
     const OPTION_ACTIVATED = 'b2brouter_activated';
 
-    public static function get_instance() {
-        if (null === self::$instance) {
-            self::$instance = new self();
-        }
-        return self::$instance;
-    }
-
-    private function __construct() {
+    /**
+     * Constructor
+     *
+     * @since 1.0.0
+     */
+    public function __construct() {
         // Constructor
     }
 
     /**
      * Get API key
+     *
+     * @since 1.0.0
+     * @return string The API key
      */
     public function get_api_key() {
         return get_option(self::OPTION_API_KEY, '');
@@ -37,6 +48,10 @@ class B2Brouter_Settings {
 
     /**
      * Set API key
+     *
+     * @since 1.0.0
+     * @param string $api_key The API key to save
+     * @return bool True on success, false on failure
      */
     public function set_api_key($api_key) {
         return update_option(self::OPTION_API_KEY, sanitize_text_field($api_key));
@@ -44,6 +59,9 @@ class B2Brouter_Settings {
 
     /**
      * Get invoice mode (automatic or manual)
+     *
+     * @since 1.0.0
+     * @return string The invoice mode ('automatic' or 'manual')
      */
     public function get_invoice_mode() {
         return get_option(self::OPTION_INVOICE_MODE, 'manual');
@@ -51,6 +69,10 @@ class B2Brouter_Settings {
 
     /**
      * Set invoice mode
+     *
+     * @since 1.0.0
+     * @param string $mode The invoice mode ('automatic' or 'manual')
+     * @return bool True on success, false on failure
      */
     public function set_invoice_mode($mode) {
         if (in_array($mode, array('automatic', 'manual'))) {
@@ -61,6 +83,9 @@ class B2Brouter_Settings {
 
     /**
      * Get transaction count
+     *
+     * @since 1.0.0
+     * @return int The transaction count
      */
     public function get_transaction_count() {
         return (int) get_option(self::OPTION_TRANSACTION_COUNT, 0);
@@ -68,6 +93,9 @@ class B2Brouter_Settings {
 
     /**
      * Increment transaction count
+     *
+     * @since 1.0.0
+     * @return bool True on success, false on failure
      */
     public function increment_transaction_count() {
         $count = $this->get_transaction_count();
@@ -76,6 +104,9 @@ class B2Brouter_Settings {
 
     /**
      * Check if API key is configured
+     *
+     * @since 1.0.0
+     * @return bool True if API key is configured, false otherwise
      */
     public function is_api_key_configured() {
         $api_key = $this->get_api_key();
@@ -84,6 +115,9 @@ class B2Brouter_Settings {
 
     /**
      * Should show welcome page
+     *
+     * @since 1.0.0
+     * @return bool True if welcome page should be shown, false otherwise
      */
     public function should_show_welcome() {
         return get_option(self::OPTION_SHOW_WELCOME, '0') === '1';
@@ -91,6 +125,9 @@ class B2Brouter_Settings {
 
     /**
      * Mark welcome page as shown
+     *
+     * @since 1.0.0
+     * @return bool True on success, false on failure
      */
     public function mark_welcome_shown() {
         return update_option(self::OPTION_SHOW_WELCOME, '0');
@@ -98,6 +135,10 @@ class B2Brouter_Settings {
 
     /**
      * Validate API key with B2Brouter
+     *
+     * @since 1.0.0
+     * @param string $api_key The API key to validate
+     * @return array{valid: bool, message: string} Validation result
      */
     public function validate_api_key($api_key) {
         try {
@@ -125,7 +166,7 @@ class B2Brouter_Settings {
                 'valid' => true,
                 'message' => __('API key is valid', 'b2brouter-woocommerce')
             );
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             return array(
                 'valid' => false,
                 'message' => sprintf(

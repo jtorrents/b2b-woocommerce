@@ -1,45 +1,72 @@
 <?php
 /**
  * Invoice Generator - Integrates with B2Brouter PHP SDK
+ *
+ * @package B2Brouter\WooCommerce
+ * @since 1.0.0
  */
+
+namespace B2Brouter\WooCommerce;
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
-class B2Brouter_Invoice_Generator {
+/**
+ * Invoice Generator class
+ *
+ * Handles invoice generation and API communication with B2Brouter
+ *
+ * @since 1.0.0
+ */
+class Invoice_Generator {
 
-    private static $instance = null;
+    /**
+     * Settings instance
+     *
+     * @since 1.0.0
+     * @var Settings
+     */
+    private $settings;
+
+    /**
+     * B2Brouter API client
+     *
+     * @since 1.0.0
+     * @var \B2BRouter\Client\B2BRouterClient|null
+     */
     private $client = null;
 
-    public static function get_instance() {
-        if (null === self::$instance) {
-            self::$instance = new self();
-        }
-        return self::$instance;
-    }
-
-    private function __construct() {
-        // Constructor
+    /**
+     * Constructor
+     *
+     * @since 1.0.0
+     * @param Settings $settings Settings instance
+     */
+    public function __construct(Settings $settings) {
+        $this->settings = $settings;
     }
 
     /**
      * Get B2Brouter client instance
+     *
+     * @since 1.0.0
+     * @return \B2BRouter\Client\B2BRouterClient The B2Brouter API client
+     * @throws \Exception If API key is not configured or SDK is not found
      */
     private function get_client() {
         if (null !== $this->client) {
             return $this->client;
         }
 
-        $settings = B2Brouter_Settings::get_instance();
-        $api_key = $settings->get_api_key();
+        $api_key = $this->settings->get_api_key();
 
         if (empty($api_key)) {
-            throw new Exception(__('API key not configured', 'b2brouter-woocommerce'));
+            throw new \Exception(__('API key not configured', 'b2brouter-woocommerce'));
         }
 
         if (!class_exists('B2BRouter\Client\B2BRouterClient')) {
-            throw new Exception(__('B2Brouter PHP SDK not found', 'b2brouter-woocommerce'));
+            throw new \Exception(__('B2Brouter PHP SDK not found', 'b2brouter-woocommerce'));
         }
 
         $this->client = new \B2BRouter\Client\B2BRouterClient($api_key);
@@ -49,6 +76,10 @@ class B2Brouter_Invoice_Generator {
 
     /**
      * Generate invoice from WooCommerce order
+     *
+     * @since 1.0.0
+     * @param int $order_id The WooCommerce order ID
+     * @return array{success: bool, invoice_id?: string, invoice_number?: string, message: string} Generation result
      */
     public function generate_invoice($order_id) {
         try {
@@ -56,12 +87,12 @@ class B2Brouter_Invoice_Generator {
             $order = wc_get_order($order_id);
 
             if (!$order) {
-                throw new Exception(__('Order not found', 'b2brouter-woocommerce'));
+                throw new \Exception(__('Order not found', 'b2brouter-woocommerce'));
             }
 
             // Check if invoice already generated
             if ($order->get_meta('_b2brouter_invoice_id')) {
-                throw new Exception(__('Invoice already generated for this order', 'b2brouter-woocommerce'));
+                throw new \Exception(__('Invoice already generated for this order', 'b2brouter-woocommerce'));
             }
 
             // Get client
@@ -91,8 +122,7 @@ class B2Brouter_Invoice_Generator {
             );
 
             // Increment transaction counter
-            $settings = B2Brouter_Settings::get_instance();
-            $settings->increment_transaction_count();
+            $this->settings->increment_transaction_count();
 
             return array(
                 'success' => true,
@@ -101,7 +131,7 @@ class B2Brouter_Invoice_Generator {
                 'message' => __('Invoice generated successfully', 'b2brouter-woocommerce')
             );
 
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             // Log error
             error_log('B2Brouter Invoice Generation Error: ' . $e->getMessage());
 
@@ -124,6 +154,10 @@ class B2Brouter_Invoice_Generator {
 
     /**
      * Prepare invoice data from WooCommerce order
+     *
+     * @since 1.0.0
+     * @param \WC_Order $order The WooCommerce order
+     * @return array The invoice data array for B2Brouter API
      */
     private function prepare_invoice_data($order) {
         // Get billing details
@@ -194,6 +228,11 @@ class B2Brouter_Invoice_Generator {
 
     /**
      * Get tax rate for order item
+     *
+     * @since 1.0.0
+     * @param \WC_Order_Item_Product $item The order item
+     * @param \WC_Order $order The order
+     * @return float The tax rate percentage
      */
     private function get_item_tax_rate($item, $order) {
         $taxes = $item->get_taxes();
@@ -214,6 +253,10 @@ class B2Brouter_Invoice_Generator {
 
     /**
      * Get tax rate for shipping
+     *
+     * @since 1.0.0
+     * @param \WC_Order $order The order
+     * @return float The shipping tax rate percentage
      */
     private function get_shipping_tax_rate($order) {
         $shipping_total = $order->get_shipping_total();
@@ -228,6 +271,10 @@ class B2Brouter_Invoice_Generator {
 
     /**
      * Check if order has invoice
+     *
+     * @since 1.0.0
+     * @param int $order_id The order ID
+     * @return bool True if order has invoice, false otherwise
      */
     public function has_invoice($order_id) {
         $order = wc_get_order($order_id);
@@ -239,6 +286,10 @@ class B2Brouter_Invoice_Generator {
 
     /**
      * Get invoice ID for order
+     *
+     * @since 1.0.0
+     * @param int $order_id The order ID
+     * @return string|null The invoice ID or null if not found
      */
     public function get_invoice_id($order_id) {
         $order = wc_get_order($order_id);

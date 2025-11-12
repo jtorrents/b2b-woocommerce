@@ -1,24 +1,53 @@
 <?php
 /**
  * Admin Interface Handler
+ *
+ * @package B2Brouter\WooCommerce
+ * @since 1.0.0
  */
+
+namespace B2Brouter\WooCommerce;
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
-class B2Brouter_Admin {
+/**
+ * Admin class
+ *
+ * Handles all admin interface, settings pages, and AJAX operations
+ *
+ * @since 1.0.0
+ */
+class Admin {
 
-    private static $instance = null;
+    /**
+     * Settings instance
+     *
+     * @since 1.0.0
+     * @var Settings
+     */
+    private $settings;
 
-    public static function get_instance() {
-        if (null === self::$instance) {
-            self::$instance = new self();
-        }
-        return self::$instance;
-    }
+    /**
+     * Invoice Generator instance
+     *
+     * @since 1.0.0
+     * @var Invoice_Generator
+     */
+    private $invoice_generator;
 
-    private function __construct() {
+    /**
+     * Constructor
+     *
+     * @since 1.0.0
+     * @param Settings $settings Settings instance
+     * @param Invoice_Generator $invoice_generator Invoice generator instance
+     */
+    public function __construct(Settings $settings, Invoice_Generator $invoice_generator) {
+        $this->settings = $settings;
+        $this->invoice_generator = $invoice_generator;
+
         // Add admin menu
         add_action('admin_menu', array($this, 'add_admin_menu'));
 
@@ -44,6 +73,9 @@ class B2Brouter_Admin {
 
     /**
      * Add admin menu
+     *
+     * @since 1.0.0
+     * @return void
      */
     public function add_admin_menu() {
         add_menu_page(
@@ -77,6 +109,9 @@ class B2Brouter_Admin {
 
     /**
      * Register settings
+     *
+     * @since 1.0.0
+     * @return void
      */
     public function register_settings() {
         register_setting('b2brouter_settings', 'b2brouter_api_key');
@@ -85,12 +120,13 @@ class B2Brouter_Admin {
 
     /**
      * Maybe show welcome page on activation
+     *
+     * @since 1.0.0
+     * @return void
      */
     public function maybe_show_welcome() {
-        $settings = B2Brouter_Settings::get_instance();
-
-        if ($settings->should_show_welcome()) {
-            $settings->mark_welcome_shown();
+        if ($this->settings->should_show_welcome()) {
+            $this->settings->mark_welcome_shown();
             wp_safe_redirect(admin_url('admin.php?page=b2brouter-welcome'));
             exit;
         }
@@ -98,6 +134,10 @@ class B2Brouter_Admin {
 
     /**
      * Add plugin action links
+     *
+     * @since 1.0.0
+     * @param array $links Existing plugin action links
+     * @return array Modified plugin action links
      */
     public function add_plugin_action_links($links) {
         $settings_link = sprintf(
@@ -113,14 +153,17 @@ class B2Brouter_Admin {
 
     /**
      * Add admin bar counter
+     *
+     * @since 1.0.0
+     * @param \WP_Admin_Bar $wp_admin_bar Admin bar instance
+     * @return void
      */
     public function add_admin_bar_counter($wp_admin_bar) {
         if (!current_user_can('manage_woocommerce')) {
             return;
         }
 
-        $settings = B2Brouter_Settings::get_instance();
-        $count = $settings->get_transaction_count();
+        $count = $this->settings->get_transaction_count();
 
         $wp_admin_bar->add_node(array(
             'id'    => 'b2brouter-counter',
@@ -137,6 +180,10 @@ class B2Brouter_Admin {
 
     /**
      * Enqueue admin scripts
+     *
+     * @since 1.0.0
+     * @param string $hook Current admin page hook
+     * @return void
      */
     public function enqueue_admin_scripts($hook) {
         if (strpos($hook, 'b2brouter') === false && $hook !== 'post.php' && $hook !== 'edit.php') {
@@ -172,6 +219,9 @@ class B2Brouter_Admin {
 
     /**
      * AJAX: Validate API key
+     *
+     * @since 1.0.0
+     * @return void
      */
     public function ajax_validate_api_key() {
         check_ajax_referer('b2brouter_nonce', 'nonce');
@@ -182,8 +232,7 @@ class B2Brouter_Admin {
 
         $api_key = isset($_POST['api_key']) ? sanitize_text_field($_POST['api_key']) : '';
 
-        $settings = B2Brouter_Settings::get_instance();
-        $result = $settings->validate_api_key($api_key);
+        $result = $this->settings->validate_api_key($api_key);
 
         if ($result['valid']) {
             wp_send_json_success($result);
@@ -194,6 +243,9 @@ class B2Brouter_Admin {
 
     /**
      * AJAX: Generate invoice
+     *
+     * @since 1.0.0
+     * @return void
      */
     public function ajax_generate_invoice() {
         check_ajax_referer('b2brouter_nonce', 'nonce');
@@ -208,8 +260,7 @@ class B2Brouter_Admin {
             wp_send_json_error(array('message' => __('Invalid order ID', 'b2brouter-woocommerce')));
         }
 
-        $generator = B2Brouter_Invoice_Generator::get_instance();
-        $result = $generator->generate_invoice($order_id);
+        $result = $this->invoice_generator->generate_invoice($order_id);
 
         if ($result['success']) {
             wp_send_json_success($result);
@@ -220,6 +271,9 @@ class B2Brouter_Admin {
 
     /**
      * Render welcome page
+     *
+     * @since 1.0.0
+     * @return void
      */
     public function render_welcome_page() {
         ?>
@@ -272,26 +326,28 @@ class B2Brouter_Admin {
 
     /**
      * Render settings page
+     *
+     * @since 1.0.0
+     * @return void
      */
     public function render_settings_page() {
-        $settings = B2Brouter_Settings::get_instance();
-        $api_key = $settings->get_api_key();
-        $invoice_mode = $settings->get_invoice_mode();
-        $transaction_count = $settings->get_transaction_count();
-        $api_configured = $settings->is_api_key_configured();
+        $api_key = $this->settings->get_api_key();
+        $invoice_mode = $this->settings->get_invoice_mode();
+        $transaction_count = $this->settings->get_transaction_count();
+        $api_configured = $this->settings->is_api_key_configured();
 
         if (isset($_POST['b2brouter_save_settings']) && check_admin_referer('b2brouter_settings')) {
             // Save API key
             if (isset($_POST['b2brouter_api_key'])) {
                 $new_api_key = sanitize_text_field($_POST['b2brouter_api_key']);
-                $settings->set_api_key($new_api_key);
+                $this->settings->set_api_key($new_api_key);
                 $api_key = $new_api_key;
             }
 
             // Save invoice mode
             if (isset($_POST['b2brouter_invoice_mode'])) {
-                $settings->set_invoice_mode(sanitize_text_field($_POST['b2brouter_invoice_mode']));
-                $invoice_mode = $settings->get_invoice_mode();
+                $this->settings->set_invoice_mode(sanitize_text_field($_POST['b2brouter_invoice_mode']));
+                $invoice_mode = $this->settings->get_invoice_mode();
             }
 
             echo '<div class="notice notice-success"><p>' . esc_html__('Settings saved successfully.', 'b2brouter-woocommerce') . '</p></div>';
