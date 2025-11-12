@@ -1,0 +1,250 @@
+<?php
+/**
+ * Invoice Generator - Integrates with B2Brouter PHP SDK
+ */
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+class B2Brouter_Invoice_Generator {
+
+    private static $instance = null;
+    private $client = null;
+
+    public static function get_instance() {
+        if (null === self::$instance) {
+            self::$instance = new self();
+        }
+        return self::$instance;
+    }
+
+    private function __construct() {
+        // Constructor
+    }
+
+    /**
+     * Get B2Brouter client instance
+     */
+    private function get_client() {
+        if (null !== $this->client) {
+            return $this->client;
+        }
+
+        $settings = B2Brouter_Settings::get_instance();
+        $api_key = $settings->get_api_key();
+
+        if (empty($api_key)) {
+            throw new Exception(__('API key not configured', 'b2brouter-woocommerce'));
+        }
+
+        if (!class_exists('B2BRouter\Client\B2BRouterClient')) {
+            throw new Exception(__('B2Brouter PHP SDK not found', 'b2brouter-woocommerce'));
+        }
+
+        $this->client = new \B2BRouter\Client\B2BRouterClient($api_key);
+
+        return $this->client;
+    }
+
+    /**
+     * Generate invoice from WooCommerce order
+     */
+    public function generate_invoice($order_id) {
+        try {
+            // Get order
+            $order = wc_get_order($order_id);
+
+            if (!$order) {
+                throw new Exception(__('Order not found', 'b2brouter-woocommerce'));
+            }
+
+            // Check if invoice already generated
+            if ($order->get_meta('_b2brouter_invoice_id')) {
+                throw new Exception(__('Invoice already generated for this order', 'b2brouter-woocommerce'));
+            }
+
+            // Get client
+            $client = $this->get_client();
+
+            // Prepare invoice data
+            $invoice_data = $this->prepare_invoice_data($order);
+
+            // Create invoice via B2Brouter API
+            $invoice = $client->invoices->create($invoice_data);
+
+            // Send invoice
+            $client->invoices->send($invoice['id']);
+
+            // Store invoice ID in order meta
+            $order->add_meta_data('_b2brouter_invoice_id', $invoice['id'], true);
+            $order->add_meta_data('_b2brouter_invoice_number', $invoice['number'] ?? '', true);
+            $order->add_meta_data('_b2brouter_invoice_date', current_time('mysql'), true);
+            $order->save();
+
+            // Add order note
+            $order->add_order_note(
+                sprintf(
+                    __('B2Brouter invoice generated successfully. Invoice ID: %s', 'b2brouter-woocommerce'),
+                    $invoice['id']
+                )
+            );
+
+            // Increment transaction counter
+            $settings = B2Brouter_Settings::get_instance();
+            $settings->increment_transaction_count();
+
+            return array(
+                'success' => true,
+                'invoice_id' => $invoice['id'],
+                'invoice_number' => $invoice['number'] ?? '',
+                'message' => __('Invoice generated successfully', 'b2brouter-woocommerce')
+            );
+
+        } catch (Exception $e) {
+            // Log error
+            error_log('B2Brouter Invoice Generation Error: ' . $e->getMessage());
+
+            // Add order note with error
+            if ($order) {
+                $order->add_order_note(
+                    sprintf(
+                        __('B2Brouter invoice generation failed: %s', 'b2brouter-woocommerce'),
+                        $e->getMessage()
+                    )
+                );
+            }
+
+            return array(
+                'success' => false,
+                'message' => $e->getMessage()
+            );
+        }
+    }
+
+    /**
+     * Prepare invoice data from WooCommerce order
+     */
+    private function prepare_invoice_data($order) {
+        // Get billing details
+        $billing_name = trim($order->get_billing_first_name() . ' ' . $order->get_billing_last_name());
+        if (empty($billing_name)) {
+            $billing_name = $order->get_billing_company();
+        }
+
+        // Prepare line items
+        $line_items = array();
+
+        foreach ($order->get_items() as $item) {
+            $product = $item->get_product();
+            $line_items[] = array(
+                'description' => $item->get_name(),
+                'quantity' => $item->get_quantity(),
+                'unit_price' => $order->get_item_subtotal($item, false, false),
+                'tax_rate' => $this->get_item_tax_rate($item, $order),
+                'total' => $item->get_total(),
+            );
+        }
+
+        // Add shipping as line item if exists
+        if ($order->get_shipping_total() > 0) {
+            $line_items[] = array(
+                'description' => __('Shipping', 'b2brouter-woocommerce'),
+                'quantity' => 1,
+                'unit_price' => $order->get_shipping_total(),
+                'tax_rate' => $this->get_shipping_tax_rate($order),
+                'total' => $order->get_shipping_total(),
+            );
+        }
+
+        // Prepare invoice data
+        $invoice_data = array(
+            'customer' => array(
+                'name' => $billing_name,
+                'email' => $order->get_billing_email(),
+                'address' => array(
+                    'street' => $order->get_billing_address_1(),
+                    'city' => $order->get_billing_city(),
+                    'postal_code' => $order->get_billing_postcode(),
+                    'country' => $order->get_billing_country(),
+                ),
+            ),
+            'line_items' => $line_items,
+            'currency' => $order->get_currency(),
+            'date' => current_time('Y-m-d'),
+            'metadata' => array(
+                'woocommerce_order_id' => $order->get_id(),
+                'woocommerce_order_number' => $order->get_order_number(),
+            ),
+        );
+
+        // Add company name if available
+        if ($order->get_billing_company()) {
+            $invoice_data['customer']['company'] = $order->get_billing_company();
+        }
+
+        // Add VAT number if available (from custom field)
+        $vat_number = $order->get_meta('_billing_vat_number');
+        if (!empty($vat_number)) {
+            $invoice_data['customer']['vat_number'] = $vat_number;
+        }
+
+        return $invoice_data;
+    }
+
+    /**
+     * Get tax rate for order item
+     */
+    private function get_item_tax_rate($item, $order) {
+        $taxes = $item->get_taxes();
+
+        if (empty($taxes['total'])) {
+            return 0;
+        }
+
+        $tax_total = array_sum($taxes['total']);
+        $item_total = $item->get_total();
+
+        if ($item_total > 0) {
+            return round(($tax_total / $item_total) * 100, 2);
+        }
+
+        return 0;
+    }
+
+    /**
+     * Get tax rate for shipping
+     */
+    private function get_shipping_tax_rate($order) {
+        $shipping_total = $order->get_shipping_total();
+        $shipping_tax = $order->get_shipping_tax();
+
+        if ($shipping_total > 0 && $shipping_tax > 0) {
+            return round(($shipping_tax / $shipping_total) * 100, 2);
+        }
+
+        return 0;
+    }
+
+    /**
+     * Check if order has invoice
+     */
+    public function has_invoice($order_id) {
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            return false;
+        }
+        return !empty($order->get_meta('_b2brouter_invoice_id'));
+    }
+
+    /**
+     * Get invoice ID for order
+     */
+    public function get_invoice_id($order_id) {
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            return null;
+        }
+        return $order->get_meta('_b2brouter_invoice_id');
+    }
+}

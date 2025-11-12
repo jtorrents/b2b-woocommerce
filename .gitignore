@@ -1,0 +1,32 @@
+# Composer
+/vendor/
+composer.lock
+
+# WordPress
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+error_log
+
+# OS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Build
+/build/
+/dist/
