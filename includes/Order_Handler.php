@@ -182,7 +182,7 @@ class Order_Handler {
             <?php endif; ?>
 
             <p>
-                <a href="https://b2brouter.com/invoices" target="_blank" class="button button-secondary">
+                <a href="https://app.b2brouter.net" target="_blank" class="button button-secondary">
                     <?php esc_html_e('View in B2Brouter', 'b2brouter-woocommerce'); ?>
                 </a>
             </p>
