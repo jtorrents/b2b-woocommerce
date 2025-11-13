@@ -109,7 +109,7 @@ class Order_Handler {
 
         // WooCommerce HPOS compatibility
         if (class_exists('Automattic\WooCommerce\Utilities\OrderUtil') &&
-            Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled()) {
+            \Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled()) {
             add_meta_box(
                 'b2brouter_invoice',
                 __('B2Brouter Invoice', 'b2brouter-woocommerce'),
