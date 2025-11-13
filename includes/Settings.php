@@ -23,6 +23,7 @@ class Settings {
 
     const OPTION_API_KEY = 'b2brouter_api_key';
     const OPTION_ACCOUNT_ID = 'b2brouter_account_id';
+    const OPTION_ENVIRONMENT = 'b2brouter_environment';
     const OPTION_INVOICE_MODE = 'b2brouter_invoice_mode';
     const OPTION_TRANSACTION_COUNT = 'b2brouter_transaction_count';
     const OPTION_SHOW_WELCOME = 'b2brouter_show_welcome';
@@ -77,6 +78,46 @@ class Settings {
      */
     public function set_account_id($account_id) {
         return update_option(self::OPTION_ACCOUNT_ID, sanitize_text_field($account_id));
+    }
+
+    /**
+     * Get environment (staging or production)
+     *
+     * @since 1.0.0
+     * @return string The environment ('staging' or 'production')
+     */
+    public function get_environment() {
+        return get_option(self::OPTION_ENVIRONMENT, 'staging');
+    }
+
+    /**
+     * Set environment
+     *
+     * @since 1.0.0
+     * @param string $environment The environment ('staging' or 'production')
+     * @return bool True on success, false on failure
+     */
+    public function set_environment($environment) {
+        if (in_array($environment, array('staging', 'production'))) {
+            return update_option(self::OPTION_ENVIRONMENT, $environment);
+        }
+        return false;
+    }
+
+    /**
+     * Get API base URL for current environment
+     *
+     * @since 1.0.0
+     * @return string The API base URL
+     */
+    public function get_api_base_url() {
+        $environment = $this->get_environment();
+
+        if ($environment === 'production') {
+            return 'https://api.b2brouter.net';
+        }
+
+        return 'https://api-staging.b2brouter.net';
     }
 
     /**
@@ -179,7 +220,9 @@ class Settings {
                 );
             }
 
-            $client = new \B2BRouter\B2BRouterClient($api_key);
+            // Create client with environment setting
+            $options = array('api_base' => $this->get_api_base_url());
+            $client = new \B2BRouter\B2BRouterClient($api_key, $options);
 
             // Call GET /accounts to validate the key and retrieve account ID
             $url = $client->getApiBase() . '/accounts?limit=1';

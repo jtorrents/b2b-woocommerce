@@ -115,6 +115,7 @@ class Admin {
      */
     public function register_settings() {
         register_setting('b2brouter_settings', 'b2brouter_api_key');
+        register_setting('b2brouter_settings', 'b2brouter_environment');
         register_setting('b2brouter_settings', 'b2brouter_invoice_mode');
     }
 
@@ -335,6 +336,7 @@ class Admin {
      */
     public function render_settings_page() {
         $api_key = $this->settings->get_api_key();
+        $environment = $this->settings->get_environment();
         $invoice_mode = $this->settings->get_invoice_mode();
         $transaction_count = $this->settings->get_transaction_count();
         $api_configured = $this->settings->is_api_key_configured();
@@ -345,6 +347,12 @@ class Admin {
                 $new_api_key = sanitize_text_field($_POST['b2brouter_api_key']);
                 $this->settings->set_api_key($new_api_key);
                 $api_key = $new_api_key;
+            }
+
+            // Save environment
+            if (isset($_POST['b2brouter_environment'])) {
+                $this->settings->set_environment(sanitize_text_field($_POST['b2brouter_environment']));
+                $environment = $this->settings->get_environment();
             }
 
             // Save invoice mode
@@ -392,6 +400,35 @@ class Admin {
                                 <?php esc_html_e('Enter your B2Brouter API key to enable invoice generation.', 'b2brouter-woocommerce'); ?>
                                 <a href="https://app.b2brouter.net" target="_blank"><?php esc_html_e('Get your API key', 'b2brouter-woocommerce'); ?></a>
                             </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row">
+                            <?php esc_html_e('Environment', 'b2brouter-woocommerce'); ?>
+                        </th>
+                        <td>
+                            <fieldset>
+                                <label>
+                                    <input type="radio"
+                                           name="b2brouter_environment"
+                                           value="staging"
+                                           <?php checked($environment, 'staging'); ?>>
+                                    <?php esc_html_e('Staging', 'b2brouter-woocommerce'); ?>
+                                    <code>api-staging.b2brouter.net</code>
+                                </label>
+                                <p class="description"><?php esc_html_e('Use staging environment for testing', 'b2brouter-woocommerce'); ?></p>
+
+                                <label>
+                                    <input type="radio"
+                                           name="b2brouter_environment"
+                                           value="production"
+                                           <?php checked($environment, 'production'); ?>>
+                                    <?php esc_html_e('Production', 'b2brouter-woocommerce'); ?>
+                                    <code>api.b2brouter.net</code>
+                                </label>
+                                <p class="description"><?php esc_html_e('Use production environment for live invoices', 'b2brouter-woocommerce'); ?></p>
+                            </fieldset>
                         </td>
                     </tr>
 

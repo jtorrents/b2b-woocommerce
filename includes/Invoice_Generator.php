@@ -69,7 +69,9 @@ class Invoice_Generator {
             throw new \Exception(__('B2Brouter PHP SDK not found', 'b2brouter-woocommerce'));
         }
 
-        $this->client = new \B2BRouter\B2BRouterClient($api_key);
+        // Create client with environment setting
+        $options = array('api_base' => $this->settings->get_api_base_url());
+        $this->client = new \B2BRouter\B2BRouterClient($api_key, $options);
 
         return $this->client;
     }

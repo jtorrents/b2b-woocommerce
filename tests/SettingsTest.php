@@ -70,6 +70,7 @@ class SettingsTest extends TestCase {
     public function test_constants_are_defined() {
         $this->assertEquals('b2brouter_api_key', Settings::OPTION_API_KEY);
         $this->assertEquals('b2brouter_account_id', Settings::OPTION_ACCOUNT_ID);
+        $this->assertEquals('b2brouter_environment', Settings::OPTION_ENVIRONMENT);
         $this->assertEquals('b2brouter_invoice_mode', Settings::OPTION_INVOICE_MODE);
         $this->assertEquals('b2brouter_transaction_count', Settings::OPTION_TRANSACTION_COUNT);
         $this->assertEquals('b2brouter_show_welcome', Settings::OPTION_SHOW_WELCOME);
@@ -176,6 +177,89 @@ class SettingsTest extends TestCase {
         $this->settings->set_account_id('  211162  ');
         $stored = $this->settings->get_account_id();
         $this->assertEquals('211162', $stored);
+    }
+
+    // ========== Environment Tests ==========
+
+    /**
+     * Test get_environment returns 'staging' by default
+     *
+     * @return void
+     */
+    public function test_get_environment_returns_staging_by_default() {
+        $environment = $this->settings->get_environment();
+        $this->assertEquals('staging', $environment);
+    }
+
+    /**
+     * Test set_environment accepts 'staging'
+     *
+     * @return void
+     */
+    public function test_set_environment_accepts_staging() {
+        $result = $this->settings->set_environment('staging');
+        $this->assertTrue($result);
+        $this->assertEquals('staging', $this->settings->get_environment());
+    }
+
+    /**
+     * Test set_environment accepts 'production'
+     *
+     * @return void
+     */
+    public function test_set_environment_accepts_production() {
+        $result = $this->settings->set_environment('production');
+        $this->assertTrue($result);
+        $this->assertEquals('production', $this->settings->get_environment());
+    }
+
+    /**
+     * Test set_environment rejects invalid values
+     *
+     * @return void
+     */
+    public function test_set_environment_rejects_invalid_values() {
+        $result = $this->settings->set_environment('invalid');
+        $this->assertFalse($result);
+
+        $result = $this->settings->set_environment('');
+        $this->assertFalse($result);
+
+        $result = $this->settings->set_environment('PRODUCTION');
+        $this->assertFalse($result);
+    }
+
+    /**
+     * Test get_api_base_url returns staging URL by default
+     *
+     * @return void
+     */
+    public function test_get_api_base_url_returns_staging_by_default() {
+        $url = $this->settings->get_api_base_url();
+        $this->assertEquals('https://api-staging.b2brouter.net', $url);
+    }
+
+    /**
+     * Test get_api_base_url returns production URL when set
+     *
+     * @return void
+     */
+    public function test_get_api_base_url_returns_production_when_set() {
+        $this->settings->set_environment('production');
+        $url = $this->settings->get_api_base_url();
+        $this->assertEquals('https://api.b2brouter.net', $url);
+    }
+
+    /**
+     * Test get_api_base_url returns staging URL when explicitly set
+     *
+     * @return void
+     */
+    public function test_get_api_base_url_returns_staging_when_set() {
+        $this->settings->set_environment('production');
+        $this->settings->set_environment('staging');
+        $url = $this->settings->get_api_base_url();
+        $this->assertEquals('https://api-staging.b2brouter.net', $url);
     }
 
     // ========== Invoice Mode Tests ==========
@@ -440,6 +524,9 @@ class SettingsTest extends TestCase {
             'set_api_key',
             'get_account_id',
             'set_account_id',
+            'get_environment',
+            'set_environment',
+            'get_api_base_url',
             'get_invoice_mode',
             'set_invoice_mode',
             'get_transaction_count',
