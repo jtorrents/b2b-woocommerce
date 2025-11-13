@@ -65,11 +65,11 @@ class Invoice_Generator {
             throw new \Exception(__('API key not configured', 'b2brouter-woocommerce'));
         }
 
-        if (!class_exists('B2BRouter\Client\B2BRouterClient')) {
+        if (!class_exists('B2BRouter\B2BRouterClient')) {
             throw new \Exception(__('B2Brouter PHP SDK not found', 'b2brouter-woocommerce'));
         }
 
-        $this->client = new \B2BRouter\Client\B2BRouterClient($api_key);
+        $this->client = new \B2BRouter\B2BRouterClient($api_key);
 
         return $this->client;
     }
@@ -98,11 +98,18 @@ class Invoice_Generator {
             // Get client
             $client = $this->get_client();
 
+            // Get account ID
+            $account_id = $this->settings->get_account_id();
+
+            if (empty($account_id)) {
+                throw new \Exception(__('Account ID not configured. Please validate your API key.', 'b2brouter-woocommerce'));
+            }
+
             // Prepare invoice data
             $invoice_data = $this->prepare_invoice_data($order);
 
             // Create invoice via B2Brouter API
-            $invoice = $client->invoices->create($invoice_data);
+            $invoice = $client->invoices->create($account_id, array('invoice' => $invoice_data));
 
             // Send invoice
             $client->invoices->send($invoice['id']);

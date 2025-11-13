@@ -22,6 +22,7 @@ if (!defined('ABSPATH')) {
 class Settings {
 
     const OPTION_API_KEY = 'b2brouter_api_key';
+    const OPTION_ACCOUNT_ID = 'b2brouter_account_id';
     const OPTION_INVOICE_MODE = 'b2brouter_invoice_mode';
     const OPTION_TRANSACTION_COUNT = 'b2brouter_transaction_count';
     const OPTION_SHOW_WELCOME = 'b2brouter_show_welcome';
@@ -55,6 +56,27 @@ class Settings {
      */
     public function set_api_key($api_key) {
         return update_option(self::OPTION_API_KEY, sanitize_text_field($api_key));
+    }
+
+    /**
+     * Get account ID
+     *
+     * @since 1.0.0
+     * @return string The account ID
+     */
+    public function get_account_id() {
+        return get_option(self::OPTION_ACCOUNT_ID, '');
+    }
+
+    /**
+     * Set account ID
+     *
+     * @since 1.0.0
+     * @param string $account_id The account ID to save
+     * @return bool True on success, false on failure
+     */
+    public function set_account_id($account_id) {
+        return update_option(self::OPTION_ACCOUNT_ID, sanitize_text_field($account_id));
     }
 
     /**
@@ -150,21 +172,65 @@ class Settings {
             }
 
             // Try to initialize the client
-            if (!class_exists('B2BRouter\Client\B2BRouterClient')) {
+            if (!class_exists('B2BRouter\B2BRouterClient')) {
                 return array(
                     'valid' => false,
                     'message' => __('B2Brouter PHP SDK not found. Please install dependencies.', 'b2brouter-woocommerce')
                 );
             }
 
-            $client = new \B2BRouter\Client\B2BRouterClient($api_key);
+            $client = new \B2BRouter\B2BRouterClient($api_key);
 
-            // Try to list invoices to validate the key
-            $result = $client->invoices->all(['limit' => 1]);
+            // Call GET /accounts to validate the key and retrieve account ID
+            $url = $client->getApiBase() . '/accounts?limit=1';
+
+            $headers = array(
+                'X-B2B-API-Key' => $api_key,
+                'X-B2B-API-Version' => $client->getApiVersion(),
+                'Accept' => 'application/json'
+            );
+
+            $response = $client->getHttpClient()->request(
+                'GET',
+                $url,
+                $headers,
+                null,
+                $client->getTimeout()
+            );
+
+            // Check if request was successful
+            if ($response['status'] !== 200) {
+                $body = json_decode($response['body'], true);
+                $error_message = isset($body['message']) ? $body['message'] : __('Invalid API key', 'b2brouter-woocommerce');
+
+                return array(
+                    'valid' => false,
+                    'message' => $error_message
+                );
+            }
+
+            // Parse response and extract first account ID
+            $body = json_decode($response['body'], true);
+
+            if (!isset($body['accounts']) || empty($body['accounts'])) {
+                return array(
+                    'valid' => false,
+                    'message' => __('No accounts found for this API key', 'b2brouter-woocommerce')
+                );
+            }
+
+            $first_account = $body['accounts'][0];
+            $account_id = (string) $first_account['id'];
+
+            // Store the account ID
+            $this->set_account_id($account_id);
 
             return array(
                 'valid' => true,
-                'message' => __('API key is valid', 'b2brouter-woocommerce')
+                'message' => sprintf(
+                    __('API key is valid. Using account: %s', 'b2brouter-woocommerce'),
+                    $first_account['name']
+                )
             );
         } catch (\Exception $e) {
             return array(

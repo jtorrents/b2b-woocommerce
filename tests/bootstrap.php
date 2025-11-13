@@ -633,24 +633,85 @@ if (!class_exists('WC_Order_Item_Product')) {
 
 // Mock B2Brouter SDK classes for testing
 // Must use eval to create namespaced class at runtime
-if (!class_exists('B2BRouter\Client\B2BRouterClient')) {
+if (!class_exists('B2BRouter\B2BRouterClient')) {
     eval('
-    namespace B2BRouter\Client {
+    namespace B2BRouter {
+        namespace HttpClient {
+            class MockHttpClient {
+                public function request($method, $url, $headers, $body, $timeout) {
+                    // Mock GET /accounts endpoint
+                    if ($method === "GET" && strpos($url, "/accounts") !== false) {
+                        return [
+                            "status" => 200,
+                            "body" => json_encode([
+                                "accounts" => [
+                                    [
+                                        "id" => 211162,
+                                        "name" => "Test Account",
+                                        "tin_value" => "ES01738726H"
+                                    ]
+                                ],
+                                "total_count" => 1,
+                                "offset" => 0,
+                                "limit" => 25
+                            ]),
+                            "headers" => []
+                        ];
+                    }
+
+                    // Mock other endpoints
+                    return [
+                        "status" => 200,
+                        "body" => json_encode([]),
+                        "headers" => []
+                    ];
+                }
+            }
+        }
+
         class B2BRouterClient {
             public $invoices;
+            private $apiKey;
+            private $apiBase = "https://api-staging.b2brouter.net";
+            private $apiVersion = "2025-10-13";
+            private $httpClient;
+            private $timeout = 80;
 
-            public function __construct($api_key) {
+            public function __construct($api_key, array $options = []) {
+                $this->apiKey = $api_key;
+                $this->httpClient = new HttpClient\MockHttpClient();
+
                 $this->invoices = new class {
-                    public function create($data) {
+                    public function create($account, $params) {
                         return ["id" => "test-invoice-id", "number" => "INV-001"];
                     }
                     public function send($id) {
                         return true;
                     }
-                    public function all($params) {
+                    public function all($account, $params) {
                         return [];
                     }
                 };
+            }
+
+            public function getApiKey() {
+                return $this->apiKey;
+            }
+
+            public function getApiBase() {
+                return $this->apiBase;
+            }
+
+            public function getApiVersion() {
+                return $this->apiVersion;
+            }
+
+            public function getHttpClient() {
+                return $this->httpClient;
+            }
+
+            public function getTimeout() {
+                return $this->timeout;
             }
         }
     }

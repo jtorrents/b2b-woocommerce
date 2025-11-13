@@ -69,6 +69,7 @@ class SettingsTest extends TestCase {
      */
     public function test_constants_are_defined() {
         $this->assertEquals('b2brouter_api_key', Settings::OPTION_API_KEY);
+        $this->assertEquals('b2brouter_account_id', Settings::OPTION_ACCOUNT_ID);
         $this->assertEquals('b2brouter_invoice_mode', Settings::OPTION_INVOICE_MODE);
         $this->assertEquals('b2brouter_transaction_count', Settings::OPTION_TRANSACTION_COUNT);
         $this->assertEquals('b2brouter_show_welcome', Settings::OPTION_SHOW_WELCOME);
@@ -139,6 +140,42 @@ class SettingsTest extends TestCase {
     public function test_is_api_key_configured_returns_true_when_set() {
         $this->settings->set_api_key('some-key');
         $this->assertTrue($this->settings->is_api_key_configured());
+    }
+
+    // ========== Account ID Tests ==========
+
+    /**
+     * Test get_account_id returns empty string by default
+     *
+     * @return void
+     */
+    public function test_get_account_id_returns_empty_by_default() {
+        $account_id = $this->settings->get_account_id();
+        $this->assertEquals('', $account_id);
+    }
+
+    /**
+     * Test set_account_id stores the account ID
+     *
+     * @return void
+     */
+    public function test_set_account_id_stores_value() {
+        $result = $this->settings->set_account_id('211162');
+        $this->assertTrue($result);
+
+        $stored = $this->settings->get_account_id();
+        $this->assertEquals('211162', $stored);
+    }
+
+    /**
+     * Test set_account_id sanitizes input
+     *
+     * @return void
+     */
+    public function test_set_account_id_sanitizes_input() {
+        $this->settings->set_account_id('  211162  ');
+        $stored = $this->settings->get_account_id();
+        $this->assertEquals('211162', $stored);
     }
 
     // ========== Invoice Mode Tests ==========
@@ -304,7 +341,7 @@ class SettingsTest extends TestCase {
     public function test_validate_api_key_requires_sdk() {
         // The bootstrap file creates a mock B2BRouterClient class
         // Verify the namespaced class exists
-        $this->assertTrue(class_exists('B2BRouter\Client\B2BRouterClient'));
+        $this->assertTrue(class_exists('B2BRouter\B2BRouterClient'));
     }
 
     /**
@@ -323,17 +360,18 @@ class SettingsTest extends TestCase {
     }
 
     /**
-     * Test validate_api_key with valid key format
+     * Test validate_api_key with invalid key returns error
+     *
+     * Note: With real SDK installed, this makes actual API calls
      *
      * @return void
      */
-    public function test_validate_api_key_with_valid_format() {
-        // Mock B2BRouterClient is set up in bootstrap to succeed
-        $result = $this->settings->validate_api_key('valid-api-key-12345');
+    public function test_validate_api_key_with_invalid_key() {
+        $result = $this->settings->validate_api_key('invalid-key');
 
         $this->assertIsArray($result);
-        $this->assertTrue($result['valid']);
-        $this->assertStringContainsString('valid', strtolower($result['message']));
+        $this->assertFalse($result['valid']);
+        $this->assertIsString($result['message']);
     }
 
     // ========== Integration Tests ==========
@@ -400,6 +438,8 @@ class SettingsTest extends TestCase {
         $methods = [
             'get_api_key',
             'set_api_key',
+            'get_account_id',
+            'set_account_id',
             'get_invoice_mode',
             'set_invoice_mode',
             'get_transaction_count',
