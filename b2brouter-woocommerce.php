@@ -134,10 +134,10 @@ class B2Brouter_WooCommerce {
         // Initialize dependency container
         $this->init_container();
 
-        // Initialize classes
-        $this->container['settings'];
-        $this->container['admin'];
-        $this->container['order_handler'];
+        // Initialize classes (instantiate them)
+        $this->get('settings');
+        $this->get('admin');
+        $this->get('order_handler');
     }
 
     /**

@@ -81,7 +81,7 @@ class Admin {
         add_menu_page(
             __('B2Brouter', 'b2brouter-woocommerce'),
             __('B2Brouter', 'b2brouter-woocommerce'),
-            'manage_woocommerce',
+            'manage_options',
             'b2brouter',
             array($this, 'render_settings_page'),
             'dashicons-media-document',
@@ -92,7 +92,7 @@ class Admin {
             'b2brouter',
             __('Settings', 'b2brouter-woocommerce'),
             __('Settings', 'b2brouter-woocommerce'),
-            'manage_woocommerce',
+            'manage_options',
             'b2brouter',
             array($this, 'render_settings_page')
         );
@@ -101,7 +101,7 @@ class Admin {
             'b2brouter',
             __('Welcome', 'b2brouter-woocommerce'),
             __('Welcome', 'b2brouter-woocommerce'),
-            'manage_woocommerce',
+            'manage_options',
             'b2brouter-welcome',
             array($this, 'render_welcome_page')
         );
@@ -159,7 +159,7 @@ class Admin {
      * @return void
      */
     public function add_admin_bar_counter($wp_admin_bar) {
-        if (!current_user_can('manage_woocommerce')) {
+        if (!current_user_can('manage_options')) {
             return;
         }
 
@@ -226,7 +226,7 @@ class Admin {
     public function ajax_validate_api_key() {
         check_ajax_referer('b2brouter_nonce', 'nonce');
 
-        if (!current_user_can('manage_woocommerce')) {
+        if (!current_user_can('manage_options')) {
             wp_send_json_error(array('message' => __('Permission denied', 'b2brouter-woocommerce')));
         }
 
@@ -250,7 +250,7 @@ class Admin {
     public function ajax_generate_invoice() {
         check_ajax_referer('b2brouter_nonce', 'nonce');
 
-        if (!current_user_can('manage_woocommerce')) {
+        if (!current_user_can('manage_options')) {
             wp_send_json_error(array('message' => __('Permission denied', 'b2brouter-woocommerce')));
         }
 
