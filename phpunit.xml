@@ -1,29 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<phpunit
-    bootstrap="tests/bootstrap.php"
-    colors="true"
-    verbose="true"
-    beStrictAboutOutputDuringTests="true"
-    beStrictAboutTestsThatDoNotTestAnything="true">
-
-    <testsuites>
-        <testsuite name="B2Brouter Unit Tests">
-            <directory>tests</directory>
-        </testsuite>
-    </testsuites>
-
-    <filter>
-        <whitelist processUncoveredFilesFromWhitelist="true">
-            <directory suffix=".php">includes</directory>
-        </whitelist>
-    </filter>
-
-    <logging>
-        <log type="coverage-html" target="tests/coverage" />
-        <log type="coverage-text" target="php://stdout" showUncoveredFiles="false"/>
-    </logging>
-
-    <php>
-        <const name="PHPUNIT_RUNNING" value="true"/>
-    </php>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" bootstrap="tests/bootstrap.php" colors="true" verbose="true" beStrictAboutOutputDuringTests="true" beStrictAboutTestsThatDoNotTestAnything="true" xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/9.3/phpunit.xsd">
+  <coverage processUncoveredFiles="true">
+    <include>
+      <directory suffix=".php">includes</directory>
+    </include>
+    <report>
+      <html outputDirectory="tests/coverage"/>
+      <text outputFile="php://stdout" showUncoveredFiles="false"/>
+    </report>
+  </coverage>
+  <testsuites>
+    <testsuite name="B2Brouter Unit Tests">
+      <directory>tests</directory>
+    </testsuite>
+  </testsuites>
+  <logging/>
+  <php>
+    <const name="PHPUNIT_RUNNING" value="true"/>
+  </php>
 </phpunit>
