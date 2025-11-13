@@ -186,7 +186,10 @@ class Admin {
      * @return void
      */
     public function enqueue_admin_scripts($hook) {
-        if (strpos($hook, 'b2brouter') === false && $hook !== 'post.php' && $hook !== 'edit.php') {
+        // Load on B2Brouter pages, order edit pages, and WooCommerce HPOS order pages
+        $allowed_hooks = array('post.php', 'edit.php', 'woocommerce_page_wc-orders');
+
+        if (strpos($hook, 'b2brouter') === false && !in_array($hook, $allowed_hooks)) {
             return;
         }
 

@@ -173,62 +173,91 @@ class Invoice_Generator {
             $billing_name = $order->get_billing_company();
         }
 
+        // Prepare contact (customer) data
+        $contact = array(
+            'name' => $billing_name,
+            'email' => $order->get_billing_email(),
+            'country' => $order->get_billing_country(),
+            'address' => $order->get_billing_address_1(),
+            'city' => $order->get_billing_city(),
+            'postalcode' => $order->get_billing_postcode(),
+        );
+
+        // Add address line 2 if present
+        if ($order->get_billing_address_2()) {
+            $contact['address'] .= ', ' . $order->get_billing_address_2();
+        }
+
+        // Add VAT/TIN number if available
+        $vat_number = $order->get_meta('_billing_vat_number');
+        if (!empty($vat_number)) {
+            $contact['tin_value'] = $vat_number;
+        }
+
         // Prepare line items
-        $line_items = array();
+        $invoice_lines = array();
 
         foreach ($order->get_items() as $item) {
-            $product = $item->get_product();
-            $line_items[] = array(
+            $line = array(
                 'description' => $item->get_name(),
                 'quantity' => $item->get_quantity(),
-                'unit_price' => $order->get_item_subtotal($item, false, false),
-                'tax_rate' => $this->get_item_tax_rate($item, $order),
-                'total' => $item->get_total(),
+                'price' => (float) $order->get_item_subtotal($item, false, false),
             );
+
+            // Add taxes if present
+            $tax_rate = $this->get_item_tax_rate($item, $order);
+            if ($tax_rate > 0) {
+                $line['taxes_attributes'] = array(
+                    array(
+                        'name' => 'IVA',
+                        'category' => 'S',  // Standard rate
+                        'percent' => $tax_rate,
+                    )
+                );
+            }
+
+            $invoice_lines[] = $line;
         }
 
         // Add shipping as line item if exists
         if ($order->get_shipping_total() > 0) {
-            $line_items[] = array(
+            $shipping_line = array(
                 'description' => __('Shipping', 'b2brouter-woocommerce'),
                 'quantity' => 1,
-                'unit_price' => $order->get_shipping_total(),
-                'tax_rate' => $this->get_shipping_tax_rate($order),
-                'total' => $order->get_shipping_total(),
+                'price' => (float) $order->get_shipping_total(),
             );
+
+            $shipping_tax_rate = $this->get_shipping_tax_rate($order);
+            if ($shipping_tax_rate > 0) {
+                $shipping_line['taxes_attributes'] = array(
+                    array(
+                        'name' => 'IVA',
+                        'category' => 'S',
+                        'percent' => $shipping_tax_rate,
+                    )
+                );
+            }
+
+            $invoice_lines[] = $shipping_line;
         }
+
+        // Generate invoice number based on order
+        $invoice_number = 'INV-' . $order->get_billing_country() . '-' . date('Y') . '-' . str_pad($order->get_id(), 5, '0', STR_PAD_LEFT);
 
         // Prepare invoice data
         $invoice_data = array(
-            'customer' => array(
-                'name' => $billing_name,
-                'email' => $order->get_billing_email(),
-                'address' => array(
-                    'street' => $order->get_billing_address_1(),
-                    'city' => $order->get_billing_city(),
-                    'postal_code' => $order->get_billing_postcode(),
-                    'country' => $order->get_billing_country(),
-                ),
-            ),
-            'line_items' => $line_items,
-            'currency' => $order->get_currency(),
+            'number' => $invoice_number,
             'date' => current_time('Y-m-d'),
-            'metadata' => array(
-                'woocommerce_order_id' => $order->get_id(),
-                'woocommerce_order_number' => $order->get_order_number(),
+            'due_date' => date('Y-m-d', strtotime(current_time('Y-m-d') . ' +30 days')),
+            'currency' => $order->get_currency(),
+            'language' => substr(get_locale(), 0, 2),  // Get language from WordPress locale (e.g., 'es' from 'es_ES')
+            'contact' => $contact,
+            'invoice_lines_attributes' => $invoice_lines,
+            'extra_info' => sprintf(
+                __('WooCommerce Order #%s', 'b2brouter-woocommerce'),
+                $order->get_order_number()
             ),
         );
-
-        // Add company name if available
-        if ($order->get_billing_company()) {
-            $invoice_data['customer']['company'] = $order->get_billing_company();
-        }
-
-        // Add VAT number if available (from custom field)
-        $vat_number = $order->get_meta('_billing_vat_number');
-        if (!empty($vat_number)) {
-            $invoice_data['customer']['vat_number'] = $vat_number;
-        }
 
         return $invoice_data;
     }
