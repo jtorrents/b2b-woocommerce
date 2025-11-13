@@ -100,9 +100,28 @@ class B2Brouter_WooCommerce {
         register_activation_hook(__FILE__, array($this, 'activate'));
         register_deactivation_hook(__FILE__, array($this, 'deactivate'));
 
+        // Declare WooCommerce HPOS compatibility
+        add_action('before_woocommerce_init', array($this, 'declare_hpos_compatibility'));
+
         // Initialize hooks
         add_action('plugins_loaded', array($this, 'load_textdomain'));
         add_action('init', array($this, 'init_plugin'));
+    }
+
+    /**
+     * Declare compatibility with WooCommerce HPOS
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function declare_hpos_compatibility() {
+        if (class_exists('\Automattic\WooCommerce\Utilities\FeaturesUtil')) {
+            \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility(
+                'custom_order_tables',
+                __FILE__,
+                true
+            );
+        }
     }
 
     /**
