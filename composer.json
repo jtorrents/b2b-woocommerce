@@ -10,17 +10,15 @@
         }
     ],
     "require": {
-        "php": ">=7.4"
+        "php": ">=7.4",
+        "b2brouter/b2brouter-php": "dev-main"
     },
     "repositories": [
         {
             "type": "vcs",
-            "url": "https://github.com/jtorrents/b2b-php"
+            "url": "https://github.com/jtorrents/b2b-php.git"
         }
     ],
-    "suggest": {
-        "jtorrents/b2b-php": "Required for B2Brouter API integration (^1.0)"
-    },
     "autoload": {
         "psr-4": {
             "B2Brouter\\WooCommerce\\": "includes/"
