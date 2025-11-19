@@ -11,14 +11,8 @@
     ],
     "require": {
         "php": ">=7.4",
-        "b2brouter/b2brouter-php": "dev-main"
+        "b2brouter/b2brouter-php": "^0.9.0"
     },
-    "repositories": [
-        {
-            "type": "vcs",
-            "url": "https://github.com/jtorrents/b2b-php.git"
-        }
-    ],
     "autoload": {
         "psr-4": {
             "B2Brouter\\WooCommerce\\": "includes/"
@@ -28,12 +22,34 @@
         "phpunit/phpunit": "^9.5"
     },
     "scripts": {
+        "test": [
+            "phpunit"
+        ],
+        "test:coverage": [
+            "phpunit --coverage-html coverage/"
+        ],
+        "test:filter": [
+            "phpunit --filter"
+        ],
+        "build": [
+            "./build-release.sh"
+        ],
+        "check-sdk": [
+            "@composer show b2brouter/b2brouter-php"
+        ],
         "post-install-cmd": [
             "@php -r \"echo 'B2Brouter PHP SDK installed successfully.\\n';\""
         ],
         "post-update-cmd": [
             "@php -r \"echo 'B2Brouter PHP SDK updated successfully.\\n';\""
         ]
+    },
+    "scripts-descriptions": {
+        "test": "Run all PHPUnit tests",
+        "test:coverage": "Run tests with HTML coverage report (output to coverage/)",
+        "test:filter": "Run specific test by name (e.g., composer test:filter test_validate_api_key)",
+        "build": "Build distribution package with vendor/ included",
+        "check-sdk": "Show installed B2Brouter PHP SDK version and details"
     },
     "config": {
         "optimize-autoloader": true,

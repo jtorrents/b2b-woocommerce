@@ -26,19 +26,42 @@ B2Brouter for WooCommerce is a WordPress plugin that integrates your WooCommerce
 
 ## Installation
 
-### Manual Installation
+### For End Users (Recommended)
 
-1. Download the plugin files
-2. Upload the `b2brouter-woocommerce` folder to `/wp-content/plugins/`
-3. Run `composer install` in the plugin directory to install dependencies
-4. Activate the plugin through the 'Plugins' menu in WordPress
-5. Follow the welcome screen instructions to configure your API key
+**Download the pre-built release ZIP** (includes all dependencies):
 
-### Via Composer
+1. Download `b2brouter-woocommerce-X.X.X.zip` from the releases page
+2. In WordPress Admin, go to **Plugins → Add New → Upload Plugin**
+3. Choose the downloaded ZIP file
+4. Click **Install Now** → **Activate Plugin**
+5. Follow the welcome screen to configure your B2Brouter API key
+
+**No Composer required!** The release ZIP includes all dependencies.
+
+### For Developers
+
+If you're developing or contributing to the plugin:
 
 ```bash
-composer require b2brouter/woocommerce-plugin
+# Clone repository
+git clone https://github.com/B2Brouter/b2brouter-woocommerce.git
+cd b2brouter-woocommerce
+
+# Install dependencies via Composer
+composer install
+
+# Link to WordPress plugins directory
+ln -s $(pwd) /path/to/wordpress/wp-content/plugins/b2brouter-woocommerce
 ```
+
+**Note:** The `vendor/` directory is gitignored for development. For distribution, use the build script:
+
+```bash
+./build-release.sh
+# Creates: dist/b2brouter-woocommerce-X.X.X.zip (ready for distribution)
+```
+
+See [DISTRIBUTION.md](DISTRIBUTION.md) for complete release instructions.
 
 ## Configuration
 
@@ -184,24 +207,35 @@ The plugin provides hooks for developers:
 - `bulk_actions-edit-shop_order` - Add bulk action for invoice generation
 - `plugin_action_links_{basename}` - Add settings link to plugins page
 
-### B2B PHP SDK Integration
+### B2Brouter PHP SDK Integration
 
-The plugin uses the [B2Brouter PHP SDK](https://github.com/jtorrents/b2b-php) for all API interactions.
+The plugin uses the official [B2Brouter PHP SDK](https://github.com/B2Brouter/b2brouter-php) (v0.9.0+) for all API interactions.
+
+**SDK Information:**
+- **Packagist:** https://packagist.org/packages/b2brouter/b2brouter-php
+- **GitHub:** https://github.com/B2Brouter/b2brouter-php
+- **Version:** ^0.9.0
+- **License:** MIT
+
+**Environment Configuration:**
+- **Default:** Staging (`https://api-staging.b2brouter.net`)
+- **Production:** `https://api.b2brouter.net` (configurable in settings)
 
 Key methods used:
 
 ```php
-// Initialize client
-$client = new \B2BRouter\Client\B2BRouterClient($api_key);
+// Initialize client with environment-specific API base URL
+$api_base = $this->settings->get_api_base_url(); // Returns staging or production URL
+$client = new \B2BRouter\B2BRouterClient($api_key, ['api_base' => $api_base]);
 
 // Create invoice
-$invoice = $client->invoices->create($invoice_data);
+$invoice = $client->invoices->create($account_id, ['invoice' => $invoice_data]);
 
 // Send invoice
 $client->invoices->send($invoice['id']);
 
-// List invoices (for validation)
-$invoices = $client->invoices->all(['limit' => 1]);
+// Validate API key and get accounts
+$accounts = $client->accounts->all(['limit' => 1]);
 ```
 
 ## Support

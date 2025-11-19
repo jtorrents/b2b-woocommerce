@@ -135,13 +135,29 @@ Or via WordPress admin:
 
 ### Step 6: Install B2Brouter WooCommerce Plugin
 
+**Important:** The plugin requires the B2Brouter PHP SDK, which is installed via Composer.
+
 ```bash
-# Create symbolic link to your development plugin
+# First, install Composer dependencies in your plugin directory
+cd ~/projects/ingent/b2b-woocommerce
+composer install
+
+# This will download:
+# - b2brouter/b2brouter-php (^0.9.0) - Official SDK from Packagist
+# - phpunit/phpunit (dev dependency for testing)
+```
+
+Then link or copy the plugin to WordPress:
+
+```bash
+# Create symbolic link to your development plugin (recommended)
 cd ~/local-wordpress/wordpress/wp-content/plugins/
 ln -s ~/projects/ingent/b2b-woocommerce b2brouter-woocommerce
 
-# Or copy the plugin
+# Or copy the plugin (alternative)
 # cp -r ~/projects/ingent/b2b-woocommerce ~/local-wordpress/wordpress/wp-content/plugins/b2brouter-woocommerce
+# cd ~/local-wordpress/wordpress/wp-content/plugins/b2brouter-woocommerce
+# composer install --no-dev
 ```
 
 Activate in WordPress admin:
@@ -428,13 +444,35 @@ cat ~/local-wordpress/wordpress/wp-content/plugins/b2brouter-woocommerce/b2brout
 ```bash
 # Install Composer dependencies
 cd ~/projects/ingent/b2b-woocommerce
-composer install --no-dev
+composer install
+
+# Verify SDK is installed
+composer show b2brouter/b2brouter-php
+# Should show: versions : * 0.9.0
 
 # Check PHP version compatibility
 php -v  # Should be 7.4+
 
+# Verify required PHP extensions
+php -m | grep -E '(curl|json|mbstring)'
+
 # Check WordPress debug log
 tail -f ~/local-wordpress/wordpress/wp-content/debug.log
+```
+
+**Problem**: SDK not found or class not found errors
+
+**Solutions**:
+```bash
+# The plugin now uses the official SDK from Packagist
+# Remove old vendor directory and reinstall
+cd ~/projects/ingent/b2b-woocommerce
+rm -rf vendor/
+composer clear-cache
+composer install
+
+# Verify autoloader is working
+php -r "require 'vendor/autoload.php'; echo 'Autoloader OK\n';"
 ```
 
 ## Recommended Development Workflow
@@ -540,11 +578,54 @@ docker exec -it wordpress_db mysql -u wpuser -pwppass123 wordpress
 
 ---
 
+## SDK Version Management
+
+The plugin uses the official B2Brouter PHP SDK from Packagist.
+
+### Current SDK Version
+
+```bash
+# Check installed version
+cd ~/projects/ingent/b2b-woocommerce
+composer show b2brouter/b2brouter-php
+```
+
+Current configuration in `composer.json`:
+```json
+{
+    "require": {
+        "b2brouter/b2brouter-php": "^0.9.0"
+    }
+}
+```
+
+This means it will accept any version `>=0.9.0` and `<1.0.0`.
+
+### Updating the SDK
+
+```bash
+# Update to latest compatible version
+cd ~/projects/ingent/b2b-woocommerce
+composer update b2brouter/b2brouter-php
+
+# Check for available updates
+composer outdated b2brouter/b2brouter-php
+```
+
+### SDK Resources
+
+- **Packagist Package**: https://packagist.org/packages/b2brouter/b2brouter-php
+- **GitHub Repository**: https://github.com/B2Brouter/b2brouter-php
+- **SDK Documentation**: Check the GitHub repository README
+
+---
+
 ## Additional Resources
 
 - **WordPress Codex**: https://codex.wordpress.org/
 - **WooCommerce Docs**: https://woocommerce.com/documentation/
 - **B2Brouter API**: https://developer.b2brouter.net
+- **B2Brouter PHP SDK**: https://github.com/B2Brouter/b2brouter-php
 
 ---
 
