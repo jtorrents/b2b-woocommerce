@@ -28,6 +28,8 @@ class Settings {
     const OPTION_TRANSACTION_COUNT = 'b2brouter_transaction_count';
     const OPTION_SHOW_WELCOME = 'b2brouter_show_welcome';
     const OPTION_ACTIVATED = 'b2brouter_activated';
+    const OPTION_AUTO_SAVE_PDF = 'b2brouter_auto_save_pdf';
+    const OPTION_PDF_STORAGE_PATH = 'b2brouter_pdf_storage_path';
 
     /**
      * Constructor
@@ -284,5 +286,43 @@ class Settings {
                 )
             );
         }
+    }
+
+    /**
+     * Get auto-save PDF setting
+     *
+     * @since 1.0.0
+     * @return bool
+     */
+    public function get_auto_save_pdf() {
+        return get_option(self::OPTION_AUTO_SAVE_PDF, '0') === '1';
+    }
+
+    /**
+     * Set auto-save PDF setting
+     *
+     * @since 1.0.0
+     * @param bool $enabled
+     * @return bool
+     */
+    public function set_auto_save_pdf($enabled) {
+        return update_option(self::OPTION_AUTO_SAVE_PDF, $enabled ? '1' : '0');
+    }
+
+    /**
+     * Get PDF storage directory path
+     *
+     * @since 1.0.0
+     * @return string Full path to PDF storage directory
+     */
+    public function get_pdf_storage_path() {
+        $upload_dir = wp_upload_dir();
+        $custom_path = get_option(self::OPTION_PDF_STORAGE_PATH, '');
+
+        if (!empty($custom_path) && file_exists($custom_path)) {
+            return $custom_path;
+        }
+
+        return $upload_dir['basedir'] . '/b2brouter-invoices';
     }
 }

@@ -153,6 +153,62 @@
             }
         });
 
+        // Download/View PDF button
+        $(document).on('click', '.b2brouter-download-pdf', function(e) {
+            e.preventDefault();
+
+            var $button = $(this);
+            var orderId = $button.data('order-id');
+            var downloadMode = $button.data('download') === 'download' ? 'download' : 'view';
+
+            // Disable button and show loading
+            var originalText = $button.html();
+            $button.prop('disabled', true)
+                   .html('<span class="dashicons dashicons-update dashicons-spin"></span> ' +
+                         (downloadMode === 'download' ? 'Downloading...' : 'Loading...'));
+
+            // Create form and submit to new window/tab
+            var form = $('<form>', {
+                method: 'POST',
+                action: b2brouterAdmin.ajax_url,
+                target: downloadMode === 'download' ? '_self' : '_blank'
+            });
+
+            form.append($('<input>', {
+                name: 'action',
+                value: 'b2brouter_download_pdf',
+                type: 'hidden'
+            }));
+
+            form.append($('<input>', {
+                name: 'nonce',
+                value: b2brouterAdmin.nonce,
+                type: 'hidden'
+            }));
+
+            form.append($('<input>', {
+                name: 'order_id',
+                value: orderId,
+                type: 'hidden'
+            }));
+
+            form.append($('<input>', {
+                name: 'download',
+                value: downloadMode,
+                type: 'hidden'
+            }));
+
+            // Add to body and submit
+            $('body').append(form);
+            form.submit();
+
+            // Clean up and restore button after delay
+            setTimeout(function() {
+                form.remove();
+                $button.prop('disabled', false).html(originalText);
+            }, 2000);
+        });
+
     });
 
 })(jQuery);

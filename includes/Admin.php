@@ -69,6 +69,7 @@ class Admin {
         // Handle AJAX requests
         add_action('wp_ajax_b2brouter_validate_api_key', array($this, 'ajax_validate_api_key'));
         add_action('wp_ajax_b2brouter_generate_invoice', array($this, 'ajax_generate_invoice'));
+        add_action('wp_ajax_b2brouter_download_pdf', array($this, 'ajax_download_pdf'));
     }
 
     /**
@@ -490,5 +491,38 @@ class Admin {
             </form>
         </div>
         <?php
+    }
+
+    /**
+     * AJAX: Download invoice PDF
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function ajax_download_pdf() {
+        // Verify nonce
+        check_ajax_referer('b2brouter_nonce', 'nonce');
+
+        // Check permissions
+        if (!current_user_can('manage_options') && !current_user_can('edit_shop_orders')) {
+            wp_send_json_error(array(
+                'message' => __('Permission denied', 'b2brouter-woocommerce')
+            ));
+        }
+
+        // Get order ID
+        $order_id = isset($_POST['order_id']) ? intval($_POST['order_id']) : 0;
+
+        if (!$order_id) {
+            wp_send_json_error(array(
+                'message' => __('Invalid order ID', 'b2brouter-woocommerce')
+            ));
+        }
+
+        // Get download mode
+        $download_mode = isset($_POST['download']) && $_POST['download'] === 'download';
+
+        // Stream PDF directly (this will exit)
+        $this->invoice_generator->stream_invoice_pdf($order_id, $download_mode);
     }
 }

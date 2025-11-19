@@ -336,4 +336,356 @@ class Invoice_Generator {
         }
         return $order->get_meta('_b2brouter_invoice_id');
     }
+
+    /**
+     * Download invoice as PDF from B2Brouter API
+     *
+     * @since 1.0.0
+     * @param string $invoice_id The B2Brouter invoice ID
+     * @return array{success: bool, pdf_data?: string, filename?: string, message: string}
+     */
+    public function download_invoice_pdf($invoice_id) {
+        try {
+            if (empty($invoice_id)) {
+                throw new \Exception(__('Invoice ID is required', 'b2brouter-woocommerce'));
+            }
+
+            // Get B2Brouter client
+            $client = $this->get_client();
+
+            // Download PDF using SDK v0.9.1
+            $pdf_data = $client->invoices->downloadPdf($invoice_id);
+
+            // Validate PDF data
+            if (empty($pdf_data)) {
+                throw new \Exception(__('PDF data is empty', 'b2brouter-woocommerce'));
+            }
+
+            // Generate filename
+            $filename = sanitize_file_name("invoice-{$invoice_id}.pdf");
+
+            return array(
+                'success' => true,
+                'pdf_data' => $pdf_data,
+                'filename' => $filename,
+                'message' => __('PDF downloaded successfully', 'b2brouter-woocommerce')
+            );
+
+        } catch (\B2BRouter\Exception\ResourceNotFoundException $e) {
+            error_log('B2Brouter PDF Download - Invoice not found: ' . $invoice_id);
+            return array(
+                'success' => false,
+                'message' => __('Invoice not found', 'b2brouter-woocommerce')
+            );
+
+        } catch (\B2BRouter\Exception\AuthenticationException $e) {
+            error_log('B2Brouter PDF Download - Authentication failed: ' . $e->getMessage());
+            return array(
+                'success' => false,
+                'message' => __('API authentication failed. Please check your API key.', 'b2brouter-woocommerce')
+            );
+
+        } catch (\B2BRouter\Exception\PermissionException $e) {
+            error_log('B2Brouter PDF Download - Permission denied: ' . $e->getMessage());
+            return array(
+                'success' => false,
+                'message' => __('You do not have permission to download this invoice.', 'b2brouter-woocommerce')
+            );
+
+        } catch (\B2BRouter\Exception\ApiErrorException $e) {
+            error_log('B2Brouter PDF Download - API error: ' . $e->getMessage());
+            return array(
+                'success' => false,
+                'message' => sprintf(
+                    __('API error: %s', 'b2brouter-woocommerce'),
+                    $e->getMessage()
+                )
+            );
+
+        } catch (\Exception $e) {
+            error_log('B2Brouter PDF Download - Error: ' . $e->getMessage());
+            return array(
+                'success' => false,
+                'message' => $e->getMessage()
+            );
+        }
+    }
+
+    /**
+     * Save invoice PDF to local storage
+     *
+     * @since 1.0.0
+     * @param int $order_id The WooCommerce order ID
+     * @param bool $force_download Force new download even if file exists
+     * @return array{success: bool, file_path?: string, file_url?: string, message: string}
+     */
+    public function save_invoice_pdf($order_id, $force_download = false) {
+        try {
+            // Get order
+            $order = wc_get_order($order_id);
+
+            if (!$order) {
+                throw new \Exception(__('Order not found', 'b2brouter-woocommerce'));
+            }
+
+            // Get invoice ID
+            $invoice_id = $order->get_meta('_b2brouter_invoice_id');
+
+            if (empty($invoice_id)) {
+                throw new \Exception(__('No invoice found for this order', 'b2brouter-woocommerce'));
+            }
+
+            // Check if PDF already exists and we're not forcing download
+            $existing_path = $order->get_meta('_b2brouter_invoice_pdf_path');
+            if (!$force_download && !empty($existing_path) && file_exists($existing_path)) {
+                $upload_dir = wp_upload_dir();
+                $filename = basename($existing_path);
+                $file_url = $upload_dir['baseurl'] . '/b2brouter-invoices/' . $filename;
+
+                return array(
+                    'success' => true,
+                    'file_path' => $existing_path,
+                    'file_url' => $file_url,
+                    'message' => __('Using existing PDF file', 'b2brouter-woocommerce'),
+                    'cached' => true
+                );
+            }
+
+            // Download PDF from API
+            $result = $this->download_invoice_pdf($invoice_id);
+
+            if (!$result['success']) {
+                throw new \Exception($result['message']);
+            }
+
+            // Create storage directory
+            $storage_path = $this->settings->get_pdf_storage_path();
+
+            if (!file_exists($storage_path)) {
+                if (!wp_mkdir_p($storage_path)) {
+                    throw new \Exception(__('Failed to create PDF storage directory', 'b2brouter-woocommerce'));
+                }
+
+                // Add security files
+                $this->secure_pdf_directory($storage_path);
+            }
+
+            // Generate unique filename
+            $filename = sanitize_file_name("invoice-order-{$order_id}-{$invoice_id}.pdf");
+            $file_path = $storage_path . '/' . $filename;
+
+            // Save PDF file
+            $bytes_written = file_put_contents($file_path, $result['pdf_data']);
+
+            if ($bytes_written === false) {
+                throw new \Exception(__('Failed to save PDF file', 'b2brouter-woocommerce'));
+            }
+
+            // Store metadata in order
+            $order->update_meta_data('_b2brouter_invoice_pdf_path', $file_path);
+            $order->update_meta_data('_b2brouter_invoice_pdf_filename', $filename);
+            $order->update_meta_data('_b2brouter_invoice_pdf_size', $bytes_written);
+            $order->update_meta_data('_b2brouter_invoice_pdf_date', current_time('mysql'));
+            $order->save();
+
+            // Generate URL (note: direct access blocked by .htaccess)
+            $upload_dir = wp_upload_dir();
+            $file_url = $upload_dir['baseurl'] . '/b2brouter-invoices/' . $filename;
+
+            return array(
+                'success' => true,
+                'file_path' => $file_path,
+                'file_url' => $file_url,
+                'file_size' => $bytes_written,
+                'message' => __('PDF saved successfully', 'b2brouter-woocommerce')
+            );
+
+        } catch (\Exception $e) {
+            error_log('B2Brouter Save PDF Error: ' . $e->getMessage());
+            return array(
+                'success' => false,
+                'message' => $e->getMessage()
+            );
+        }
+    }
+
+    /**
+     * Secure PDF storage directory
+     *
+     * @since 1.0.0
+     * @param string $directory_path Directory to secure
+     * @return void
+     */
+    private function secure_pdf_directory($directory_path) {
+        // Add .htaccess to prevent direct access
+        $htaccess_path = $directory_path . '/.htaccess';
+        $htaccess_content = "# B2Brouter Invoice PDFs - Access Denied\n";
+        $htaccess_content .= "Options -Indexes\n";
+        $htaccess_content .= "<Files *.pdf>\n";
+        $htaccess_content .= "    Require all denied\n";
+        $htaccess_content .= "</Files>\n";
+
+        file_put_contents($htaccess_path, $htaccess_content);
+
+        // Add index.php to prevent directory listing
+        $index_path = $directory_path . '/index.php';
+        file_put_contents($index_path, "<?php\n// Silence is golden.");
+    }
+
+    /**
+     * Stream invoice PDF directly to browser
+     *
+     * @since 1.0.0
+     * @param int $order_id The WooCommerce order ID
+     * @param bool $download Force download vs inline display
+     * @return void Outputs PDF and exits
+     */
+    public function stream_invoice_pdf($order_id, $download = false) {
+        try {
+            // Get order
+            $order = wc_get_order($order_id);
+
+            if (!$order) {
+                wp_die(
+                    esc_html__('Order not found', 'b2brouter-woocommerce'),
+                    esc_html__('Error', 'b2brouter-woocommerce'),
+                    array('response' => 404)
+                );
+            }
+
+            // Check permissions
+            if (!$this->can_access_invoice($order)) {
+                wp_die(
+                    esc_html__('You do not have permission to access this invoice.', 'b2brouter-woocommerce'),
+                    esc_html__('Permission Denied', 'b2brouter-woocommerce'),
+                    array('response' => 403)
+                );
+            }
+
+            // Get invoice ID
+            $invoice_id = $order->get_meta('_b2brouter_invoice_id');
+
+            if (empty($invoice_id)) {
+                wp_die(
+                    esc_html__('No invoice found for this order', 'b2brouter-woocommerce'),
+                    esc_html__('Error', 'b2brouter-woocommerce'),
+                    array('response' => 404)
+                );
+            }
+
+            // Check if PDF exists locally
+            $pdf_path = $order->get_meta('_b2brouter_invoice_pdf_path');
+
+            if (!empty($pdf_path) && file_exists($pdf_path)) {
+                // Use cached PDF
+                $pdf_data = file_get_contents($pdf_path);
+                $filename = basename($pdf_path);
+            } else {
+                // Download and save PDF (this will cache it)
+                $save_result = $this->save_invoice_pdf($order_id, false);
+
+                if (!$save_result['success']) {
+                    wp_die(
+                        esc_html($save_result['message']),
+                        esc_html__('Error', 'b2brouter-woocommerce'),
+                        array('response' => 500)
+                    );
+                }
+
+                // Read the saved PDF file
+                $pdf_data = file_get_contents($save_result['file_path']);
+                $filename = basename($save_result['file_path']);
+            }
+
+            // Clear any previous output
+            if (ob_get_level()) {
+                ob_end_clean();
+            }
+
+            // Set headers
+            header('Content-Type: application/pdf');
+            header('Content-Length: ' . strlen($pdf_data));
+
+            if ($download) {
+                header('Content-Disposition: attachment; filename="' . $filename . '"');
+            } else {
+                header('Content-Disposition: inline; filename="' . $filename . '"');
+            }
+
+            header('Cache-Control: private, max-age=0, must-revalidate');
+            header('Pragma: public');
+            header('Expires: 0');
+
+            // Output PDF
+            echo $pdf_data;
+            exit;
+
+        } catch (\Exception $e) {
+            error_log('B2Brouter Stream PDF Error: ' . $e->getMessage());
+            wp_die(
+                esc_html($e->getMessage()),
+                esc_html__('Error', 'b2brouter-woocommerce'),
+                array('response' => 500)
+            );
+        }
+    }
+
+    /**
+     * Check if current user can access invoice for order
+     *
+     * @since 1.0.0
+     * @param \WC_Order $order The order
+     * @return bool True if user has access
+     */
+    private function can_access_invoice($order) {
+        // Admins can always access
+        if (current_user_can('manage_woocommerce')) {
+            return true;
+        }
+
+        // Check if current user is the order customer
+        $user_id = get_current_user_id();
+        if ($user_id > 0 && (int) $order->get_customer_id() === $user_id) {
+            return true;
+        }
+
+        // Check for guest access with order key
+        if (isset($_GET['key']) && $order->get_order_key() === $_GET['key']) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Delete stored PDF for an order
+     *
+     * @since 1.0.0
+     * @param int $order_id The order ID
+     * @return bool True on success
+     */
+    public function delete_invoice_pdf($order_id) {
+        $order = wc_get_order($order_id);
+
+        if (!$order) {
+            return false;
+        }
+
+        $pdf_path = $order->get_meta('_b2brouter_invoice_pdf_path');
+
+        if (!empty($pdf_path) && file_exists($pdf_path)) {
+            if (unlink($pdf_path)) {
+                // Clear metadata
+                $order->delete_meta_data('_b2brouter_invoice_pdf_path');
+                $order->delete_meta_data('_b2brouter_invoice_pdf_filename');
+                $order->delete_meta_data('_b2brouter_invoice_pdf_size');
+                $order->delete_meta_data('_b2brouter_invoice_pdf_date');
+                $order->save();
+
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

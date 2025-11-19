@@ -154,6 +154,48 @@ class Order_Handler {
                     <strong><?php esc_html_e('Generated Date:', 'b2brouter-woocommerce'); ?></strong>
                     <br><?php echo esc_html($order->get_meta('_b2brouter_invoice_date')); ?>
                 </p>
+
+                <!-- PDF Download Section -->
+                <hr style="margin: 15px 0;">
+                <p>
+                    <button type="button"
+                            class="button button-secondary b2brouter-download-pdf"
+                            data-order-id="<?php echo esc_attr($order_id); ?>"
+                            data-download="view"
+                            style="width: 100%; margin-bottom: 5px;">
+                        <span class="dashicons dashicons-pdf"></span>
+                        <?php esc_html_e('View PDF', 'b2brouter-woocommerce'); ?>
+                    </button>
+                </p>
+                <p>
+                    <button type="button"
+                            class="button button-secondary b2brouter-download-pdf"
+                            data-order-id="<?php echo esc_attr($order_id); ?>"
+                            data-download="download"
+                            style="width: 100%;">
+                        <span class="dashicons dashicons-download"></span>
+                        <?php esc_html_e('Download PDF', 'b2brouter-woocommerce'); ?>
+                    </button>
+                </p>
+
+                <?php
+                // Show PDF cache status if available
+                $pdf_path = $order->get_meta('_b2brouter_invoice_pdf_path');
+                if (!empty($pdf_path) && file_exists($pdf_path)):
+                    $pdf_size = $order->get_meta('_b2brouter_invoice_pdf_size');
+                    $pdf_date = $order->get_meta('_b2brouter_invoice_pdf_date');
+                ?>
+                <p class="description" style="margin-top: 10px; font-size: 11px;">
+                    <span class="dashicons dashicons-yes-alt" style="color: #46b450; font-size: 14px;"></span>
+                    <?php
+                    printf(
+                        esc_html__('PDF cached (%s, %s)', 'b2brouter-woocommerce'),
+                        esc_html(size_format($pdf_size, 2)),
+                        esc_html(human_time_diff(strtotime($pdf_date), current_time('timestamp'))) . ' ' . esc_html__('ago', 'b2brouter-woocommerce')
+                    );
+                    ?>
+                </p>
+                <?php endif; ?>
             <?php else: ?>
                 <p class="b2brouter-invoice-status">
                     <span class="dashicons dashicons-warning" style="color: #f0b849;"></span>
