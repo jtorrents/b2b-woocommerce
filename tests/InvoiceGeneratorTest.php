@@ -52,6 +52,41 @@ class InvoiceGeneratorTest extends TestCase {
     }
 
     /**
+     * Helper method to inject a mock B2BRouter client
+     *
+     * @return void
+     */
+    private function injectMockClient() {
+        // Create a mock B2BRouter client with real API payload
+        $mock_client = new class {
+            public $invoices;
+            public function __construct() {
+                $this->invoices = new class {
+                    public function create($account, $params) {
+                        return [
+                            'id' => 354754,
+                            'number' => 'INV-ES-2025-00078',
+                            'total' => 200.0
+                        ];
+                    }
+                    public function send($id) {
+                        return true;
+                    }
+                    public function downloadPdf($invoice_id) {
+                        return "%PDF-1.5\n%PDF data\n%%EOF";
+                    }
+                };
+            }
+        };
+
+        // Inject mock client using reflection
+        $reflection = new \ReflectionClass($this->generator);
+        $clientProperty = $reflection->getProperty('client');
+        $clientProperty->setAccessible(true);
+        $clientProperty->setValue($this->generator, $mock_client);
+    }
+
+    /**
      * Test that Invoice_Generator can be instantiated with Settings
      *
      * @return void
@@ -132,11 +167,9 @@ class InvoiceGeneratorTest extends TestCase {
     /**
      * Test successful invoice generation
      *
-     * @group integration
      * @return void
      */
     public function test_generate_invoice_success() {
-        $this->markTestSkipped('Integration test - requires real API access');
         global $mock_orders;
 
         // Create a mock order
@@ -150,21 +183,28 @@ class InvoiceGeneratorTest extends TestCase {
                            ->willReturn('valid-api-key');
         $this->mock_settings->method('get_account_id')
                            ->willReturn('211162');
+        $this->mock_settings->method('get_auto_save_pdf')
+                           ->willReturn(false); // Don't auto-save PDF in this test
+        $this->mock_settings->method('get_api_base_url')
+                           ->willReturn('https://api-staging.b2brouter.net');
         $this->mock_settings->expects($this->once())
                            ->method('increment_transaction_count');
+
+        // Inject mock B2BRouter client
+        $this->injectMockClient();
 
         // Generate invoice
         $result = $this->generator->generate_invoice(100);
 
-        // Verify success
+        // Verify success with REAL API payload values
         $this->assertTrue($result['success']);
-        $this->assertEquals('test-invoice-id', $result['invoice_id']);
-        $this->assertEquals('INV-001', $result['invoice_number']);
+        $this->assertEquals(354754, $result['invoice_id']);
+        $this->assertEquals('INV-ES-2025-00078', $result['invoice_number']);
         $this->assertStringContainsString('Invoice generated successfully', $result['message']);
 
         // Verify order meta was saved
-        $this->assertEquals('test-invoice-id', $order->get_meta('_b2brouter_invoice_id'));
-        $this->assertEquals('INV-001', $order->get_meta('_b2brouter_invoice_number'));
+        $this->assertEquals(354754, $order->get_meta('_b2brouter_invoice_id'));
+        $this->assertEquals('INV-ES-2025-00078', $order->get_meta('_b2brouter_invoice_number'));
         $this->assertNotEmpty($order->get_meta('_b2brouter_invoice_date'));
 
         // Cleanup
@@ -304,11 +344,9 @@ class InvoiceGeneratorTest extends TestCase {
     /**
      * Test invoice generation with company name fallback
      *
-     * @group integration
      * @return void
      */
     public function test_generate_invoice_uses_company_name_fallback() {
-        $this->markTestSkipped('Integration test - requires real API access');
         global $mock_orders;
 
         // Order with no first/last name but has company
@@ -324,12 +362,17 @@ class InvoiceGeneratorTest extends TestCase {
                            ->willReturn('valid-api-key');
         $this->mock_settings->method('get_account_id')
                            ->willReturn('211162');
+        $this->mock_settings->method('get_auto_save_pdf')
+                           ->willReturn(false);
         $this->mock_settings->method('increment_transaction_count')
                            ->willReturn(true);
+
+        $this->injectMockClient();
 
         $result = $this->generator->generate_invoice(107);
 
         $this->assertTrue($result['success']);
+        $this->assertEquals(354754, $result['invoice_id']);
 
         // Cleanup
         unset($mock_orders[107]);
@@ -338,11 +381,9 @@ class InvoiceGeneratorTest extends TestCase {
     /**
      * Test invoice generation with shipping
      *
-     * @group integration
      * @return void
      */
     public function test_generate_invoice_includes_shipping() {
-        $this->markTestSkipped('Integration test - requires real API access');
         global $mock_orders;
 
         $order = new WC_Order(108);
@@ -356,12 +397,17 @@ class InvoiceGeneratorTest extends TestCase {
                            ->willReturn('valid-api-key');
         $this->mock_settings->method('get_account_id')
                            ->willReturn('211162');
+        $this->mock_settings->method('get_auto_save_pdf')
+                           ->willReturn(false);
         $this->mock_settings->method('increment_transaction_count')
                            ->willReturn(true);
+
+        $this->injectMockClient();
 
         $result = $this->generator->generate_invoice(108);
 
         $this->assertTrue($result['success']);
+        $this->assertEquals(354754, $result['invoice_id']);
 
         // Cleanup
         unset($mock_orders[108]);
@@ -370,11 +416,9 @@ class InvoiceGeneratorTest extends TestCase {
     /**
      * Test invoice generation with item taxes
      *
-     * @group integration
      * @return void
      */
     public function test_generate_invoice_calculates_item_tax_rate() {
-        $this->markTestSkipped('Integration test - requires real API access');
         global $mock_orders;
 
         $order = new WC_Order(109);
@@ -388,12 +432,17 @@ class InvoiceGeneratorTest extends TestCase {
                            ->willReturn('valid-api-key');
         $this->mock_settings->method('get_account_id')
                            ->willReturn('211162');
+        $this->mock_settings->method('get_auto_save_pdf')
+                           ->willReturn(false);
         $this->mock_settings->method('increment_transaction_count')
                            ->willReturn(true);
+
+        $this->injectMockClient();
 
         $result = $this->generator->generate_invoice(109);
 
         $this->assertTrue($result['success']);
+        $this->assertEquals(354754, $result['invoice_id']);
 
         // Cleanup
         unset($mock_orders[109]);
@@ -402,11 +451,9 @@ class InvoiceGeneratorTest extends TestCase {
     /**
      * Test invoice generation with zero-price item (free product)
      *
-     * @group integration
      * @return void
      */
     public function test_generate_invoice_handles_zero_price_item() {
-        $this->markTestSkipped('Integration test - requires real API access');
         global $mock_orders;
 
         $order = new WC_Order(110);
@@ -420,12 +467,17 @@ class InvoiceGeneratorTest extends TestCase {
                            ->willReturn('valid-api-key');
         $this->mock_settings->method('get_account_id')
                            ->willReturn('211162');
+        $this->mock_settings->method('get_auto_save_pdf')
+                           ->willReturn(false);
         $this->mock_settings->method('increment_transaction_count')
                            ->willReturn(true);
+
+        $this->injectMockClient();
 
         $result = $this->generator->generate_invoice(110);
 
         $this->assertTrue($result['success']);
+        $this->assertEquals(354754, $result['invoice_id']);
 
         // Cleanup
         unset($mock_orders[110]);
@@ -458,11 +510,9 @@ class InvoiceGeneratorTest extends TestCase {
     /**
      * Test multiple invoice generations use cached client
      *
-     * @group integration
      * @return void
      */
     public function test_client_is_cached_across_calls() {
-        $this->markTestSkipped('Integration test - requires real API access');
         global $mock_orders;
 
         // Create two orders
@@ -480,8 +530,12 @@ class InvoiceGeneratorTest extends TestCase {
                            ->willReturn('valid-api-key');
         $this->mock_settings->method('get_account_id')
                            ->willReturn('211162');
+        $this->mock_settings->method('get_auto_save_pdf')
+                           ->willReturn(false);
         $this->mock_settings->method('increment_transaction_count')
                            ->willReturn(true);
+
+        $this->injectMockClient();
 
         // Generate two invoices
         $result1 = $this->generator->generate_invoice(112);
@@ -489,6 +543,8 @@ class InvoiceGeneratorTest extends TestCase {
 
         $this->assertTrue($result1['success']);
         $this->assertTrue($result2['success']);
+        $this->assertEquals(354754, $result1['invoice_id']);
+        $this->assertEquals(354754, $result2['invoice_id']);
 
         // Cleanup
         unset($mock_orders[112], $mock_orders[113]);
@@ -730,5 +786,228 @@ class InvoiceGeneratorTest extends TestCase {
         $this->assertArrayHasKey('errors', $result);
         $this->assertIsInt($result['deleted']);
         $this->assertIsInt($result['errors']);
+    }
+
+    // ========== PDF Download Tests (Phase 1) ==========
+
+    /**
+     * Test download_invoice_pdf with invalid invoice ID
+     *
+     * @return void
+     */
+    public function test_download_invoice_pdf_fails_with_empty_invoice_id() {
+        $result = $this->generator->download_invoice_pdf('');
+
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('success', $result);
+        $this->assertArrayHasKey('message', $result);
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('Invoice ID is required', $result['message']);
+    }
+
+    /**
+     * Test download_invoice_pdf with no API key
+     *
+     * @return void
+     */
+    public function test_download_invoice_pdf_fails_without_api_key() {
+        $this->mock_settings->method('get_api_key')
+                           ->willReturn('');
+
+        $result = $this->generator->download_invoice_pdf('inv-123');
+
+        $this->assertIsArray($result);
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('API key not configured', $result['message']);
+    }
+
+    /**
+     * Test download_invoice_pdf returns correct structure
+     *
+     * @return void
+     */
+    public function test_download_invoice_pdf_returns_correct_structure() {
+        $this->mock_settings->method('get_api_key')
+                           ->willReturn('');
+
+        $result = $this->generator->download_invoice_pdf('inv-123');
+
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('success', $result);
+        $this->assertArrayHasKey('message', $result);
+        $this->assertIsBool($result['success']);
+        $this->assertIsString($result['message']);
+    }
+
+    // ========== PDF Save Tests (Phase 3) ==========
+
+    /**
+     * Test save_invoice_pdf with invalid order
+     *
+     * @return void
+     */
+    public function test_save_invoice_pdf_fails_with_invalid_order() {
+        $result = $this->generator->save_invoice_pdf(999);
+
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('success', $result);
+        $this->assertArrayHasKey('message', $result);
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('Order not found', $result['message']);
+    }
+
+    /**
+     * Test save_invoice_pdf with order without invoice
+     *
+     * @return void
+     */
+    public function test_save_invoice_pdf_fails_without_invoice() {
+        global $mock_orders;
+
+        $order = new WC_Order(400);
+        $mock_orders[400] = $order;
+
+        $result = $this->generator->save_invoice_pdf(400);
+
+        $this->assertIsArray($result);
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('No invoice found', $result['message']);
+
+        unset($mock_orders[400]);
+    }
+
+    /**
+     * Test save_invoice_pdf returns correct structure
+     *
+     * @return void
+     */
+    public function test_save_invoice_pdf_returns_correct_structure() {
+        $result = $this->generator->save_invoice_pdf(999);
+
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('success', $result);
+        $this->assertArrayHasKey('message', $result);
+        $this->assertIsBool($result['success']);
+        $this->assertIsString($result['message']);
+    }
+
+    /**
+     * Test save_invoice_pdf with force_download parameter
+     *
+     * @return void
+     */
+    public function test_save_invoice_pdf_accepts_force_download_parameter() {
+        global $mock_orders;
+
+        $order = new WC_Order(401);
+        $mock_orders[401] = $order;
+
+        // Test without forcing
+        $result1 = $this->generator->save_invoice_pdf(401, false);
+        $this->assertIsArray($result1);
+
+        // Test with forcing
+        $result2 = $this->generator->save_invoice_pdf(401, true);
+        $this->assertIsArray($result2);
+
+        unset($mock_orders[401]);
+    }
+
+    // ========== PDF Stream Tests (Phase 4) ==========
+
+    /**
+     * Test stream_invoice_pdf with invalid order calls wp_die
+     *
+     * @return void
+     */
+    public function test_stream_invoice_pdf_fails_with_invalid_order() {
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('wp_die called');
+
+        $this->generator->stream_invoice_pdf(999);
+    }
+
+    /**
+     * Test stream_invoice_pdf with order without invoice calls wp_die
+     *
+     * @return void
+     */
+    public function test_stream_invoice_pdf_fails_without_invoice() {
+        global $mock_orders;
+
+        $order = new WC_Order(402);
+        $mock_orders[402] = $order;
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('wp_die called');
+
+        $this->generator->stream_invoice_pdf(402);
+
+        unset($mock_orders[402]);
+    }
+
+    /**
+     * Test stream_invoice_pdf accepts download parameter (both modes call wp_die without invoice)
+     *
+     * @return void
+     */
+    public function test_stream_invoice_pdf_accepts_download_parameter() {
+        global $mock_orders;
+
+        $order = new WC_Order(403);
+        $mock_orders[403] = $order;
+
+        // Both modes should call wp_die when no invoice exists
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('wp_die called');
+
+        // Test view mode (will throw exception)
+        $this->generator->stream_invoice_pdf(403, false);
+
+        unset($mock_orders[403]);
+    }
+
+    // ========== PDF Delete Tests (Phase 5) ==========
+
+    /**
+     * Test delete_invoice_pdf with invalid order returns false
+     *
+     * @return void
+     */
+    public function test_delete_invoice_pdf_returns_false_with_invalid_order() {
+        $result = $this->generator->delete_invoice_pdf(999);
+
+        $this->assertIsBool($result);
+        $this->assertFalse($result);
+    }
+
+    /**
+     * Test delete_invoice_pdf with order without cached PDF returns false
+     *
+     * @return void
+     */
+    public function test_delete_invoice_pdf_returns_false_without_cached_pdf() {
+        global $mock_orders;
+
+        $order = new WC_Order(404);
+        $mock_orders[404] = $order;
+
+        $result = $this->generator->delete_invoice_pdf(404);
+
+        $this->assertIsBool($result);
+        $this->assertFalse($result);
+
+        unset($mock_orders[404]);
+    }
+
+    /**
+     * Test delete_invoice_pdf returns boolean
+     *
+     * @return void
+     */
+    public function test_delete_invoice_pdf_returns_boolean() {
+        $result = $this->generator->delete_invoice_pdf(999);
+
+        $this->assertIsBool($result);
     }
 }

@@ -139,6 +139,17 @@ if (!function_exists('current_time')) {
     }
 }
 
+if (!function_exists('get_locale')) {
+    /**
+     * Mock get_locale function
+     *
+     * @return string Locale
+     */
+    function get_locale() {
+        return 'en_US';
+    }
+}
+
 if (!function_exists('wc_get_order')) {
     /**
      * Mock wc_get_order function
@@ -165,6 +176,21 @@ if (!function_exists('error_log')) {
     function error_log($message) {
         // Silence errors in tests
         return true;
+    }
+}
+
+if (!function_exists('wp_die')) {
+    /**
+     * Mock wp_die function
+     *
+     * @param string $message Message
+     * @param string $title Title
+     * @param array $args Arguments
+     * @return void
+     */
+    function wp_die($message = '', $title = '', $args = array()) {
+        // In tests, just exit silently
+        throw new Exception('wp_die called: ' . $message);
     }
 }
 
@@ -305,6 +331,19 @@ if (!function_exists('esc_attr__')) {
      * @return string Escaped text
      */
     function esc_attr__($text, $domain = 'default') {
+        return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+    }
+}
+
+if (!function_exists('esc_html__')) {
+    /**
+     * Mock esc_html__ function
+     *
+     * @param string $text Text to translate and escape
+     * @param string $domain Text domain
+     * @return string Escaped text
+     */
+    function esc_html__($text, $domain = 'default') {
         return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
     }
 }
@@ -627,6 +666,7 @@ if (!class_exists('WC_Order')) {
         public function get_billing_company() { return $this->data['billing_company']; }
         public function get_billing_email() { return $this->data['billing_email']; }
         public function get_billing_address_1() { return $this->data['billing_address_1']; }
+        public function get_billing_address_2() { return isset($this->data['billing_address_2']) ? $this->data['billing_address_2'] : ''; }
         public function get_billing_city() { return $this->data['billing_city']; }
         public function get_billing_postcode() { return $this->data['billing_postcode']; }
         public function get_billing_country() { return $this->data['billing_country']; }
@@ -698,7 +738,7 @@ if (!class_exists('WC_Order_Item_Product')) {
     }
 }
 
-// Mock B2Brouter SDK classes for testing
+// Mock B2Brouter SDK classes for testing with REAL API payloads
 // Must use eval to create namespaced class at runtime
 if (!class_exists('B2BRouter\B2BRouterClient')) {
     eval('
@@ -706,7 +746,7 @@ if (!class_exists('B2BRouter\B2BRouterClient')) {
         namespace HttpClient {
             class MockHttpClient {
                 public function request($method, $url, $headers, $body, $timeout) {
-                    // Mock GET /accounts endpoint
+                    // Mock GET /accounts endpoint (API key validation)
                     if ($method === "GET" && strpos($url, "/accounts") !== false) {
                         return [
                             "status" => 200,
@@ -714,13 +754,39 @@ if (!class_exists('B2BRouter\B2BRouterClient')) {
                                 "accounts" => [
                                     [
                                         "id" => 211162,
-                                        "name" => "Test Account",
-                                        "tin_value" => "ES01738726H"
+                                        "tin_value" => "ES01738726H",
+                                        "tin_scheme" => 9920,
+                                        "cin_value" => null,
+                                        "cin_scheme" => null,
+                                        "name" => "WP test",
+                                        "address" => "casa meva",
+                                        "address2" => null,
+                                        "city" => "Barcelona",
+                                        "postalcode" => "08080",
+                                        "province" => "Barcelona",
+                                        "country" => "es",
+                                        "currency" => "EUR",
+                                        "contact_person" => null,
+                                        "phone" => null,
+                                        "email" => "jtorrents@b2brouter.net",
+                                        "rounding_method" => "half_up",
+                                        "round_before_sum" => false,
+                                        "apply_taxes_per_line" => false,
+                                        "registered_for_empl_tax" => false,
+                                        "transport_type_code" => null,
+                                        "document_type_code" => null,
+                                        "has_logo" => false,
+                                        "archived" => false,
+                                        "created_at" => "2025-11-13T09:45:30.000Z",
+                                        "updated_at" => "2025-11-13T09:47:26.000Z",
+                                        "transactions_count" => 11,
+                                        "transactions_count_previous_period" => 0,
+                                        "transactions_limit" => 100
                                     ]
                                 ],
                                 "total_count" => 1,
                                 "offset" => 0,
-                                "limit" => 25
+                                "limit" => 1
                             ]),
                             "headers" => []
                         ];
@@ -736,6 +802,11 @@ if (!class_exists('B2BRouter\B2BRouterClient')) {
             }
         }
 
+        namespace Exception {
+            class ResourceNotFoundException extends \Exception {}
+            class AuthenticationException extends \Exception {}
+        }
+
         class B2BRouterClient {
             public $invoices;
             private $apiKey;
@@ -746,15 +817,55 @@ if (!class_exists('B2BRouter\B2BRouterClient')) {
 
             public function __construct($api_key, array $options = []) {
                 $this->apiKey = $api_key;
+                if (isset($options["api_base"])) {
+                    $this->apiBase = $options["api_base"];
+                }
                 $this->httpClient = new HttpClient\MockHttpClient();
 
                 $this->invoices = new class {
                     public function create($account, $params) {
-                        return ["id" => "test-invoice-id", "number" => "INV-001"];
+                        // Return REAL API payload structure
+                        return [
+                            "id" => 354754,
+                            "type" => "IssuedInvoice",
+                            "number" => "INV-ES-2025-00078",
+                            "series_code" => null,
+                            "state" => "new",
+                            "account" => [
+                                "id" => 211162,
+                                "name" => "WP test"
+                            ],
+                            "company" => [
+                                "id" => 27176,
+                                "name" => "WP test",
+                                "tin_value" => "ES01738726H",
+                                "country" => "es"
+                            ],
+                            "contact" => [
+                                "id" => 1313321399,
+                                "name" => "test customer",
+                                "email" => "jtorrents@b2brouter.net"
+                            ],
+                            "date" => "2025-11-20",
+                            "due_date" => "2025-12-20",
+                            "subtotal" => 200.0,
+                            "total" => 200.0,
+                            "currency" => "EUR",
+                            "payable_amount" => 200.0,
+                            "extra_info" => "WooCommerce Order #78",
+                            "created_at" => "2025-11-20T10:14:24.000Z"
+                        ];
                     }
+
                     public function send($id) {
                         return true;
                     }
+
+                    public function downloadPdf($invoice_id) {
+                        // Return REAL PDF binary data (simplified for testing)
+                        return "%PDF-1.5\n%¿÷¢þ\n1 0 obj\n<< /Type /Catalog >>\nendobj\nstartxref\n%%EOF";
+                    }
+
                     public function all($account, $params) {
                         return [];
                     }
