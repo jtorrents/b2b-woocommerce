@@ -339,6 +339,7 @@ class Admin {
         $api_key = $this->settings->get_api_key();
         $environment = $this->settings->get_environment();
         $invoice_mode = $this->settings->get_invoice_mode();
+        $auto_save_pdf = $this->settings->get_auto_save_pdf();
         $transaction_count = $this->settings->get_transaction_count();
         $api_configured = $this->settings->is_api_key_configured();
 
@@ -361,6 +362,11 @@ class Admin {
                 $this->settings->set_invoice_mode(sanitize_text_field($_POST['b2brouter_invoice_mode']));
                 $invoice_mode = $this->settings->get_invoice_mode();
             }
+
+            // Save PDF auto-save setting
+            $auto_save_enabled = isset($_POST['b2brouter_auto_save_pdf']) && $_POST['b2brouter_auto_save_pdf'] === '1';
+            $this->settings->set_auto_save_pdf($auto_save_enabled);
+            $auto_save_pdf = $auto_save_enabled;
 
             echo '<div class="notice notice-success"><p>' . esc_html__('Settings saved successfully.', 'b2brouter-woocommerce') . '</p></div>';
         }
@@ -459,7 +465,73 @@ class Admin {
                             </fieldset>
                         </td>
                     </tr>
+                </table>
 
+                <h2><?php esc_html_e('PDF Options', 'b2brouter-woocommerce'); ?></h2>
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">
+                            <?php esc_html_e('Automatic PDF Caching', 'b2brouter-woocommerce'); ?>
+                        </th>
+                        <td>
+                            <fieldset>
+                                <label>
+                                    <input type="checkbox"
+                                           name="b2brouter_auto_save_pdf"
+                                           value="1"
+                                           <?php checked($auto_save_pdf, true); ?>>
+                                    <?php esc_html_e('Automatically download and cache PDF when invoice is generated', 'b2brouter-woocommerce'); ?>
+                                </label>
+                                <p class="description">
+                                    <?php esc_html_e('When enabled, PDFs will be automatically downloaded from B2Brouter and stored locally when an invoice is generated. This improves performance and reduces API calls.', 'b2brouter-woocommerce'); ?>
+                                </p>
+                            </fieldset>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row">
+                            <?php esc_html_e('PDF Storage Location', 'b2brouter-woocommerce'); ?>
+                        </th>
+                        <td>
+                            <code><?php echo esc_html($this->settings->get_pdf_storage_path()); ?></code>
+                            <p class="description">
+                                <?php esc_html_e('Invoice PDFs are stored in this directory. Files are protected from direct access via .htaccess rules.', 'b2brouter-woocommerce'); ?>
+                            </p>
+                            <?php
+                            $storage_path = $this->settings->get_pdf_storage_path();
+                            if (file_exists($storage_path)) {
+                                $pdf_files = glob($storage_path . '/*.pdf');
+                                $pdf_count = $pdf_files ? count($pdf_files) : 0;
+                                $total_size = 0;
+                                if ($pdf_files) {
+                                    foreach ($pdf_files as $file) {
+                                        $total_size += filesize($file);
+                                    }
+                                }
+                                ?>
+                                <p class="description">
+                                    <span class="dashicons dashicons-yes-alt" style="color: #46b450;"></span>
+                                    <?php
+                                    printf(
+                                        esc_html__('Currently storing %d PDF(s) using %s of disk space', 'b2brouter-woocommerce'),
+                                        $pdf_count,
+                                        size_format($total_size, 2)
+                                    );
+                                    ?>
+                                </p>
+                            <?php } else { ?>
+                                <p class="description">
+                                    <span class="dashicons dashicons-info" style="color: #72aee6;"></span>
+                                    <?php esc_html_e('Directory will be created automatically when first PDF is downloaded', 'b2brouter-woocommerce'); ?>
+                                </p>
+                            <?php } ?>
+                        </td>
+                    </tr>
+                </table>
+
+                <h2><?php esc_html_e('Plugin Information', 'b2brouter-woocommerce'); ?></h2>
+                <table class="form-table">
                     <tr>
                         <th scope="row">
                             <?php esc_html_e('Transaction Counter', 'b2brouter-woocommerce'); ?>

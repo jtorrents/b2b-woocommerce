@@ -133,6 +133,21 @@ class Invoice_Generator {
             // Increment transaction counter
             $this->settings->increment_transaction_count();
 
+            // Auto-save PDF if enabled
+            if ($this->settings->get_auto_save_pdf()) {
+                // Wait a moment for B2Brouter to process the invoice
+                sleep(2);
+
+                // Try to download and save PDF
+                $pdf_result = $this->save_invoice_pdf($order_id, false);
+
+                if ($pdf_result['success']) {
+                    $order->add_order_note(
+                        __('Invoice PDF automatically downloaded and cached locally', 'b2brouter-woocommerce')
+                    );
+                }
+            }
+
             return array(
                 'success' => true,
                 'invoice_id' => $invoice['id'],

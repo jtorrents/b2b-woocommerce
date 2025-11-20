@@ -138,6 +138,7 @@ class B2Brouter_WooCommerce {
         $this->get('settings');
         $this->get('admin');
         $this->get('order_handler');
+        $this->get('customer');
     }
 
     /**
@@ -170,6 +171,14 @@ class B2Brouter_WooCommerce {
         // Register Order_Handler (depends on Settings and Invoice_Generator)
         $this->container['order_handler'] = function() {
             return new \B2Brouter\WooCommerce\Order_Handler(
+                $this->get('settings'),
+                $this->get('invoice_generator')
+            );
+        };
+
+        // Register Customer (depends on Settings and Invoice_Generator)
+        $this->container['customer'] = function() {
+            return new \B2Brouter\WooCommerce\Customer(
                 $this->get('settings'),
                 $this->get('invoice_generator')
             );
