@@ -340,6 +340,10 @@ class Admin {
         $environment = $this->settings->get_environment();
         $invoice_mode = $this->settings->get_invoice_mode();
         $auto_save_pdf = $this->settings->get_auto_save_pdf();
+        $attach_to_completed = $this->settings->get_attach_to_order_completed();
+        $attach_to_invoice = $this->settings->get_attach_to_customer_invoice();
+        $auto_cleanup_enabled = $this->settings->get_auto_cleanup_enabled();
+        $auto_cleanup_days = $this->settings->get_auto_cleanup_days();
         $transaction_count = $this->settings->get_transaction_count();
         $api_configured = $this->settings->is_api_key_configured();
 
@@ -367,6 +371,28 @@ class Admin {
             $auto_save_enabled = isset($_POST['b2brouter_auto_save_pdf']) && $_POST['b2brouter_auto_save_pdf'] === '1';
             $this->settings->set_auto_save_pdf($auto_save_enabled);
             $auto_save_pdf = $auto_save_enabled;
+
+            // Save email attachment settings
+            $this->settings->set_attach_to_order_completed(
+                isset($_POST['b2brouter_attach_to_order_completed']) && $_POST['b2brouter_attach_to_order_completed'] === '1'
+            );
+            $attach_to_completed = $this->settings->get_attach_to_order_completed();
+
+            $this->settings->set_attach_to_customer_invoice(
+                isset($_POST['b2brouter_attach_to_customer_invoice']) && $_POST['b2brouter_attach_to_customer_invoice'] === '1'
+            );
+            $attach_to_invoice = $this->settings->get_attach_to_customer_invoice();
+
+            // Save cleanup settings
+            $this->settings->set_auto_cleanup_enabled(
+                isset($_POST['b2brouter_auto_cleanup_enabled']) && $_POST['b2brouter_auto_cleanup_enabled'] === '1'
+            );
+            $auto_cleanup_enabled = $this->settings->get_auto_cleanup_enabled();
+
+            if (isset($_POST['b2brouter_auto_cleanup_days'])) {
+                $this->settings->set_auto_cleanup_days(intval($_POST['b2brouter_auto_cleanup_days']));
+                $auto_cleanup_days = $this->settings->get_auto_cleanup_days();
+            }
 
             echo '<div class="notice notice-success"><p>' . esc_html__('Settings saved successfully.', 'b2brouter-woocommerce') . '</p></div>';
         }
@@ -526,6 +552,65 @@ class Admin {
                                     <?php esc_html_e('Directory will be created automatically when first PDF is downloaded', 'b2brouter-woocommerce'); ?>
                                 </p>
                             <?php } ?>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row">
+                            <?php esc_html_e('Email PDF Attachments', 'b2brouter-woocommerce'); ?>
+                        </th>
+                        <td>
+                            <fieldset>
+                                <label>
+                                    <input type="checkbox"
+                                           name="b2brouter_attach_to_order_completed"
+                                           value="1"
+                                           <?php checked($attach_to_completed, true); ?>>
+                                    <?php esc_html_e('Attach PDF to Order Completed email (sent to customer)', 'b2brouter-woocommerce'); ?>
+                                </label>
+                                <br>
+                                <label>
+                                    <input type="checkbox"
+                                           name="b2brouter_attach_to_customer_invoice"
+                                           value="1"
+                                           <?php checked($attach_to_invoice, true); ?>>
+                                    <?php esc_html_e('Attach PDF to Customer Invoice email', 'b2brouter-woocommerce'); ?>
+                                </label>
+                                <p class="description">
+                                    <?php esc_html_e('Automatically attach invoice PDFs to customer emails. "Order Completed" is sent when orders are fulfilled. "Customer Invoice" is sent for pending/unpaid orders or when manually sent from admin panel.', 'b2brouter-woocommerce'); ?>
+                                </p>
+                            </fieldset>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th scope="row">
+                            <?php esc_html_e('Automatic Cleanup', 'b2brouter-woocommerce'); ?>
+                        </th>
+                        <td>
+                            <fieldset>
+                                <label>
+                                    <input type="checkbox"
+                                           name="b2brouter_auto_cleanup_enabled"
+                                           value="1"
+                                           <?php checked($auto_cleanup_enabled, true); ?>>
+                                    <?php esc_html_e('Automatically delete old cached PDFs', 'b2brouter-woocommerce'); ?>
+                                </label>
+                                <br><br>
+                                <label>
+                                    <?php esc_html_e('Delete PDFs older than', 'b2brouter-woocommerce'); ?>
+                                    <input type="number"
+                                           name="b2brouter_auto_cleanup_days"
+                                           value="<?php echo esc_attr($auto_cleanup_days); ?>"
+                                           min="1"
+                                           max="365"
+                                           style="width: 80px;">
+                                    <?php esc_html_e('days', 'b2brouter-woocommerce'); ?>
+                                </label>
+                                <p class="description">
+                                    <?php esc_html_e('When enabled, PDFs older than the specified number of days will be automatically deleted daily via cron job. This helps manage disk space usage.', 'b2brouter-woocommerce'); ?>
+                                </p>
+                            </fieldset>
                         </td>
                     </tr>
                 </table>

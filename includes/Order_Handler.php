@@ -62,6 +62,15 @@ class Order_Handler {
         add_filter('bulk_actions-edit-shop_order', array($this, 'add_bulk_action'));
         add_filter('handle_bulk_actions-edit-shop_order', array($this, 'handle_bulk_action'), 10, 3);
         add_action('admin_notices', array($this, 'bulk_action_notices'));
+
+        // Email PDF attachments
+        add_filter('woocommerce_email_attachments', array($this, 'attach_pdf_to_email'), 10, 3);
+
+        // Schedule cleanup cron job
+        if (!wp_next_scheduled('b2brouter_cleanup_old_pdfs')) {
+            wp_schedule_event(time(), 'daily', 'b2brouter_cleanup_old_pdfs');
+        }
+        add_action('b2brouter_cleanup_old_pdfs', array($this, 'run_scheduled_cleanup'));
     }
 
     /**
@@ -367,6 +376,45 @@ class Order_Handler {
                 $error_count
             );
             echo '</p></div>';
+        }
+    }
+
+    /**
+     * Attach PDF to WooCommerce emails
+     *
+     * @since 1.0.0
+     * @param array $attachments Existing attachments
+     * @param string $email_id Email ID
+     * @param mixed $order Order object or false
+     * @return array Modified attachments
+     */
+    public function attach_pdf_to_email($attachments, $email_id, $order) {
+        return $this->invoice_generator->attach_pdf_to_email($attachments, $email_id, $order);
+    }
+
+    /**
+     * Run scheduled PDF cleanup
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function run_scheduled_cleanup() {
+        // Only run if automatic cleanup is enabled
+        if (!$this->settings->get_auto_cleanup_enabled()) {
+            return;
+        }
+
+        $days = $this->settings->get_auto_cleanup_days();
+        $result = $this->invoice_generator->cleanup_old_pdfs($days);
+
+        // Log the cleanup
+        if ($result['deleted'] > 0 || $result['errors'] > 0) {
+            error_log(sprintf(
+                'B2Brouter PDF Cleanup: Deleted %d files, %d errors (older than %d days)',
+                $result['deleted'],
+                $result['errors'],
+                $days
+            ));
         }
     }
 }

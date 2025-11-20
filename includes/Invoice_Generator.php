@@ -703,4 +703,136 @@ class Invoice_Generator {
 
         return false;
     }
+
+    /**
+     * Attach PDF to WooCommerce emails
+     *
+     * @since 1.0.0
+     * @param array $attachments Existing attachments
+     * @param string $email_id Email ID
+     * @param \WC_Order $order Order object
+     * @return array Modified attachments
+     */
+    public function attach_pdf_to_email($attachments, $email_id, $order) {
+        // Check if this is an object we can work with
+        if (!$order || !is_a($order, 'WC_Order')) {
+            return $attachments;
+        }
+
+        // Check if order has an invoice
+        $invoice_id = $order->get_meta('_b2brouter_invoice_id');
+        if (empty($invoice_id)) {
+            return $attachments;
+        }
+
+        // Check settings for which emails to attach to
+        $attach = false;
+
+        if ($email_id === 'customer_completed_order' && $this->settings->get_attach_to_order_completed()) {
+            $attach = true;
+        }
+
+        if ($email_id === 'customer_invoice' && $this->settings->get_attach_to_customer_invoice()) {
+            $attach = true;
+        }
+
+        if (!$attach) {
+            return $attachments;
+        }
+
+        // Try to get existing PDF
+        $pdf_path = $order->get_meta('_b2brouter_invoice_pdf_path');
+
+        // If no cached PDF, try to download it temporarily
+        if (empty($pdf_path) || !file_exists($pdf_path)) {
+            $save_result = $this->save_invoice_pdf($order->get_id(), false);
+
+            if ($save_result['success']) {
+                $pdf_path = $save_result['file_path'];
+            } else {
+                error_log('B2Brouter Email Attachment: Failed to get PDF for order ' . $order->get_id());
+                return $attachments;
+            }
+        }
+
+        // Add PDF to attachments if it exists
+        if (!empty($pdf_path) && file_exists($pdf_path)) {
+            $attachments[] = $pdf_path;
+        }
+
+        return $attachments;
+    }
+
+    /**
+     * Clean up old PDF files
+     *
+     * @since 1.0.0
+     * @param int $days Delete PDFs older than this many days
+     * @return array{deleted: int, errors: int} Results
+     */
+    public function cleanup_old_pdfs($days = 90) {
+        $storage_path = $this->settings->get_pdf_storage_path();
+        $deleted = 0;
+        $errors = 0;
+
+        if (!file_exists($storage_path)) {
+            return array('deleted' => 0, 'errors' => 0);
+        }
+
+        $pdf_files = glob($storage_path . '/*.pdf');
+
+        if (empty($pdf_files)) {
+            return array('deleted' => 0, 'errors' => 0);
+        }
+
+        $cutoff_time = time() - ($days * DAY_IN_SECONDS);
+
+        foreach ($pdf_files as $file) {
+            $file_time = filemtime($file);
+
+            if ($file_time && $file_time < $cutoff_time) {
+                if (unlink($file)) {
+                    $deleted++;
+
+                    // Try to clean up order metadata
+                    $this->cleanup_order_metadata_for_file($file);
+                } else {
+                    $errors++;
+                    error_log('B2Brouter Cleanup: Failed to delete ' . $file);
+                }
+            }
+        }
+
+        return array('deleted' => $deleted, 'errors' => $errors);
+    }
+
+    /**
+     * Clean up order metadata for deleted PDF file
+     *
+     * @since 1.0.0
+     * @param string $file_path The deleted file path
+     * @return void
+     */
+    private function cleanup_order_metadata_for_file($file_path) {
+        global $wpdb;
+
+        // Find orders with this PDF path in metadata
+        $meta_key = '_b2brouter_invoice_pdf_path';
+        $order_ids = $wpdb->get_col($wpdb->prepare(
+            "SELECT post_id FROM {$wpdb->prefix}postmeta WHERE meta_key = %s AND meta_value = %s",
+            $meta_key,
+            $file_path
+        ));
+
+        foreach ($order_ids as $order_id) {
+            $order = wc_get_order($order_id);
+            if ($order) {
+                $order->delete_meta_data('_b2brouter_invoice_pdf_path');
+                $order->delete_meta_data('_b2brouter_invoice_pdf_filename');
+                $order->delete_meta_data('_b2brouter_invoice_pdf_size');
+                $order->delete_meta_data('_b2brouter_invoice_pdf_date');
+                $order->save();
+            }
+        }
+    }
 }

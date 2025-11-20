@@ -30,6 +30,10 @@ class Settings {
     const OPTION_ACTIVATED = 'b2brouter_activated';
     const OPTION_AUTO_SAVE_PDF = 'b2brouter_auto_save_pdf';
     const OPTION_PDF_STORAGE_PATH = 'b2brouter_pdf_storage_path';
+    const OPTION_ATTACH_TO_ORDER_COMPLETED = 'b2brouter_attach_to_order_completed';
+    const OPTION_ATTACH_TO_CUSTOMER_INVOICE = 'b2brouter_attach_to_customer_invoice';
+    const OPTION_AUTO_CLEANUP_ENABLED = 'b2brouter_auto_cleanup_enabled';
+    const OPTION_AUTO_CLEANUP_DAYS = 'b2brouter_auto_cleanup_days';
 
     /**
      * Constructor
@@ -324,5 +328,89 @@ class Settings {
         }
 
         return $upload_dir['basedir'] . '/b2brouter-invoices';
+    }
+
+    /**
+     * Get attach to order completed email setting
+     *
+     * @since 1.0.0
+     * @return bool
+     */
+    public function get_attach_to_order_completed() {
+        return get_option(self::OPTION_ATTACH_TO_ORDER_COMPLETED, '0') === '1';
+    }
+
+    /**
+     * Set attach to order completed email setting
+     *
+     * @since 1.0.0
+     * @param bool $enabled
+     * @return bool
+     */
+    public function set_attach_to_order_completed($enabled) {
+        return update_option(self::OPTION_ATTACH_TO_ORDER_COMPLETED, $enabled ? '1' : '0');
+    }
+
+    /**
+     * Get attach to customer invoice email setting
+     *
+     * @since 1.0.0
+     * @return bool
+     */
+    public function get_attach_to_customer_invoice() {
+        return get_option(self::OPTION_ATTACH_TO_CUSTOMER_INVOICE, '0') === '1';
+    }
+
+    /**
+     * Set attach to customer invoice email setting
+     *
+     * @since 1.0.0
+     * @param bool $enabled
+     * @return bool
+     */
+    public function set_attach_to_customer_invoice($enabled) {
+        return update_option(self::OPTION_ATTACH_TO_CUSTOMER_INVOICE, $enabled ? '1' : '0');
+    }
+
+    /**
+     * Get auto cleanup enabled setting
+     *
+     * @since 1.0.0
+     * @return bool
+     */
+    public function get_auto_cleanup_enabled() {
+        return get_option(self::OPTION_AUTO_CLEANUP_ENABLED, '0') === '1';
+    }
+
+    /**
+     * Set auto cleanup enabled setting
+     *
+     * @since 1.0.0
+     * @param bool $enabled
+     * @return bool
+     */
+    public function set_auto_cleanup_enabled($enabled) {
+        return update_option(self::OPTION_AUTO_CLEANUP_ENABLED, $enabled ? '1' : '0');
+    }
+
+    /**
+     * Get auto cleanup days setting
+     *
+     * @since 1.0.0
+     * @return int
+     */
+    public function get_auto_cleanup_days() {
+        return intval(get_option(self::OPTION_AUTO_CLEANUP_DAYS, 90));
+    }
+
+    /**
+     * Set auto cleanup days setting
+     *
+     * @since 1.0.0
+     * @param int $days
+     * @return bool
+     */
+    public function set_auto_cleanup_days($days) {
+        return update_option(self::OPTION_AUTO_CLEANUP_DAYS, max(1, intval($days)));
     }
 }
