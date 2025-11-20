@@ -479,4 +479,157 @@ class OrderHandlerTest extends TestCase {
 
         $this->assertEmpty($output);
     }
+
+    // ========== Phase 5 Tests ==========
+
+    /**
+     * Test attach_pdf_to_email hook is registered
+     *
+     * @return void
+     */
+    public function test_attach_pdf_to_email_hook_is_registered() {
+        global $wp_filters;
+
+        $this->assertArrayHasKey('woocommerce_email_attachments', $wp_filters);
+    }
+
+    /**
+     * Test attach_pdf_to_email delegates to Invoice_Generator
+     *
+     * @return void
+     */
+    public function test_attach_pdf_to_email_delegates_to_generator() {
+        global $mock_orders;
+
+        $order = new WC_Order(400);
+        $mock_orders[400] = $order;
+
+        $attachments = array('/path/to/existing.pdf');
+        $expected_result = array('/path/to/existing.pdf', '/path/to/invoice.pdf');
+
+        // Mock Invoice_Generator to return specific result
+        $this->mock_invoice_generator->expects($this->once())
+                                    ->method('attach_pdf_to_email')
+                                    ->with($attachments, 'customer_completed_order', $order)
+                                    ->willReturn($expected_result);
+
+        $result = $this->handler->attach_pdf_to_email($attachments, 'customer_completed_order', $order);
+
+        $this->assertEquals($expected_result, $result);
+
+        unset($mock_orders[400]);
+    }
+
+    /**
+     * Test attach_pdf_to_email passes all parameters correctly
+     *
+     * @return void
+     */
+    public function test_attach_pdf_to_email_passes_parameters() {
+        global $mock_orders;
+
+        $order = new WC_Order(401);
+        $mock_orders[401] = $order;
+
+        $attachments = array();
+        $email_id = 'customer_invoice';
+
+        $this->mock_invoice_generator->expects($this->once())
+                                    ->method('attach_pdf_to_email')
+                                    ->with(
+                                        $this->equalTo($attachments),
+                                        $this->equalTo($email_id),
+                                        $this->equalTo($order)
+                                    );
+
+        $this->handler->attach_pdf_to_email($attachments, $email_id, $order);
+
+        unset($mock_orders[401]);
+    }
+
+    /**
+     * Test run_scheduled_cleanup skips when disabled
+     *
+     * @return void
+     */
+    public function test_run_scheduled_cleanup_skips_when_disabled() {
+        $this->mock_settings->method('get_auto_cleanup_enabled')
+                           ->willReturn(false);
+
+        // cleanup_old_pdfs should NOT be called
+        $this->mock_invoice_generator->expects($this->never())
+                                    ->method('cleanup_old_pdfs');
+
+        $this->handler->run_scheduled_cleanup();
+    }
+
+    /**
+     * Test run_scheduled_cleanup runs when enabled
+     *
+     * @return void
+     */
+    public function test_run_scheduled_cleanup_runs_when_enabled() {
+        $this->mock_settings->method('get_auto_cleanup_enabled')
+                           ->willReturn(true);
+        $this->mock_settings->method('get_auto_cleanup_days')
+                           ->willReturn(90);
+
+        $this->mock_invoice_generator->expects($this->once())
+                                    ->method('cleanup_old_pdfs')
+                                    ->with(90)
+                                    ->willReturn(array('deleted' => 0, 'errors' => 0));
+
+        $this->handler->run_scheduled_cleanup();
+    }
+
+    /**
+     * Test run_scheduled_cleanup uses correct days setting
+     *
+     * @return void
+     */
+    public function test_run_scheduled_cleanup_uses_correct_days() {
+        $this->mock_settings->method('get_auto_cleanup_enabled')
+                           ->willReturn(true);
+        $this->mock_settings->method('get_auto_cleanup_days')
+                           ->willReturn(60);
+
+        $this->mock_invoice_generator->expects($this->once())
+                                    ->method('cleanup_old_pdfs')
+                                    ->with(60) // Should pass 60 days
+                                    ->willReturn(array('deleted' => 0, 'errors' => 0));
+
+        $this->handler->run_scheduled_cleanup();
+    }
+
+    /**
+     * Test run_scheduled_cleanup with different days values
+     *
+     * @return void
+     */
+    public function test_run_scheduled_cleanup_with_different_days() {
+        $this->mock_settings->method('get_auto_cleanup_enabled')
+                           ->willReturn(true);
+
+        // Test with 30 days
+        $this->mock_settings->method('get_auto_cleanup_days')
+                           ->willReturn(30);
+
+        $this->mock_invoice_generator->expects($this->once())
+                                    ->method('cleanup_old_pdfs')
+                                    ->with(30)
+                                    ->willReturn(array('deleted' => 0, 'errors' => 0));
+
+        $this->handler->run_scheduled_cleanup();
+    }
+
+    /**
+     * Test cron hook is registered
+     *
+     * @return void
+     */
+    public function test_cleanup_cron_hook_is_registered() {
+        global $wp_actions;
+
+        $this->assertArrayHasKey('b2brouter_cleanup_old_pdfs', $wp_actions);
+    }
 }

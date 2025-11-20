@@ -511,6 +511,298 @@ class SettingsTest extends TestCase {
         $this->assertEquals('manual', $this->settings->get_invoice_mode());
     }
 
+    // ========== PDF Settings Tests (Phase 3) ==========
+
+    /**
+     * Test get_auto_save_pdf returns false by default
+     *
+     * @return void
+     */
+    public function test_get_auto_save_pdf_returns_false_by_default() {
+        $auto_save = $this->settings->get_auto_save_pdf();
+        $this->assertFalse($auto_save);
+    }
+
+    /**
+     * Test set_auto_save_pdf enables auto-save
+     *
+     * @return void
+     */
+    public function test_set_auto_save_pdf_enables() {
+        $result = $this->settings->set_auto_save_pdf(true);
+        $this->assertTrue($result);
+        $this->assertTrue($this->settings->get_auto_save_pdf());
+    }
+
+    /**
+     * Test set_auto_save_pdf disables auto-save
+     *
+     * @return void
+     */
+    public function test_set_auto_save_pdf_disables() {
+        $this->settings->set_auto_save_pdf(true);
+        $this->assertTrue($this->settings->get_auto_save_pdf());
+
+        $this->settings->set_auto_save_pdf(false);
+        $this->assertFalse($this->settings->get_auto_save_pdf());
+    }
+
+    /**
+     * Test get_pdf_storage_path returns default path
+     *
+     * @return void
+     */
+    public function test_get_pdf_storage_path_returns_default() {
+        $path = $this->settings->get_pdf_storage_path();
+        $this->assertIsString($path);
+        $this->assertStringContainsString('b2brouter-invoices', $path);
+    }
+
+    // ========== Email Attachment Settings Tests (Phase 5.1) ==========
+
+    /**
+     * Test get_attach_to_order_completed returns false by default
+     *
+     * @return void
+     */
+    public function test_get_attach_to_order_completed_returns_false_by_default() {
+        $attach = $this->settings->get_attach_to_order_completed();
+        $this->assertFalse($attach);
+    }
+
+    /**
+     * Test set_attach_to_order_completed enables attachment
+     *
+     * @return void
+     */
+    public function test_set_attach_to_order_completed_enables() {
+        $result = $this->settings->set_attach_to_order_completed(true);
+        $this->assertTrue($result);
+        $this->assertTrue($this->settings->get_attach_to_order_completed());
+    }
+
+    /**
+     * Test set_attach_to_order_completed disables attachment
+     *
+     * @return void
+     */
+    public function test_set_attach_to_order_completed_disables() {
+        $this->settings->set_attach_to_order_completed(true);
+        $this->settings->set_attach_to_order_completed(false);
+        $this->assertFalse($this->settings->get_attach_to_order_completed());
+    }
+
+    /**
+     * Test get_attach_to_customer_invoice returns false by default
+     *
+     * @return void
+     */
+    public function test_get_attach_to_customer_invoice_returns_false_by_default() {
+        $attach = $this->settings->get_attach_to_customer_invoice();
+        $this->assertFalse($attach);
+    }
+
+    /**
+     * Test set_attach_to_customer_invoice enables attachment
+     *
+     * @return void
+     */
+    public function test_set_attach_to_customer_invoice_enables() {
+        $result = $this->settings->set_attach_to_customer_invoice(true);
+        $this->assertTrue($result);
+        $this->assertTrue($this->settings->get_attach_to_customer_invoice());
+    }
+
+    /**
+     * Test set_attach_to_customer_invoice disables attachment
+     *
+     * @return void
+     */
+    public function test_set_attach_to_customer_invoice_disables() {
+        $this->settings->set_attach_to_customer_invoice(true);
+        $this->settings->set_attach_to_customer_invoice(false);
+        $this->assertFalse($this->settings->get_attach_to_customer_invoice());
+    }
+
+    /**
+     * Test both email attachment settings work independently
+     *
+     * @return void
+     */
+    public function test_email_attachment_settings_are_independent() {
+        // Enable only order completed
+        $this->settings->set_attach_to_order_completed(true);
+        $this->settings->set_attach_to_customer_invoice(false);
+
+        $this->assertTrue($this->settings->get_attach_to_order_completed());
+        $this->assertFalse($this->settings->get_attach_to_customer_invoice());
+
+        // Enable only customer invoice
+        $this->settings->set_attach_to_order_completed(false);
+        $this->settings->set_attach_to_customer_invoice(true);
+
+        $this->assertFalse($this->settings->get_attach_to_order_completed());
+        $this->assertTrue($this->settings->get_attach_to_customer_invoice());
+
+        // Enable both
+        $this->settings->set_attach_to_order_completed(true);
+        $this->settings->set_attach_to_customer_invoice(true);
+
+        $this->assertTrue($this->settings->get_attach_to_order_completed());
+        $this->assertTrue($this->settings->get_attach_to_customer_invoice());
+    }
+
+    // ========== Cleanup Settings Tests (Phase 5.3) ==========
+
+    /**
+     * Test get_auto_cleanup_enabled returns false by default
+     *
+     * @return void
+     */
+    public function test_get_auto_cleanup_enabled_returns_false_by_default() {
+        $enabled = $this->settings->get_auto_cleanup_enabled();
+        $this->assertFalse($enabled);
+    }
+
+    /**
+     * Test set_auto_cleanup_enabled enables cleanup
+     *
+     * @return void
+     */
+    public function test_set_auto_cleanup_enabled_enables() {
+        $result = $this->settings->set_auto_cleanup_enabled(true);
+        $this->assertTrue($result);
+        $this->assertTrue($this->settings->get_auto_cleanup_enabled());
+    }
+
+    /**
+     * Test set_auto_cleanup_enabled disables cleanup
+     *
+     * @return void
+     */
+    public function test_set_auto_cleanup_enabled_disables() {
+        $this->settings->set_auto_cleanup_enabled(true);
+        $this->settings->set_auto_cleanup_enabled(false);
+        $this->assertFalse($this->settings->get_auto_cleanup_enabled());
+    }
+
+    /**
+     * Test get_auto_cleanup_days returns 90 by default
+     *
+     * @return void
+     */
+    public function test_get_auto_cleanup_days_returns_90_by_default() {
+        $days = $this->settings->get_auto_cleanup_days();
+        $this->assertEquals(90, $days);
+        $this->assertIsInt($days);
+    }
+
+    /**
+     * Test set_auto_cleanup_days stores value
+     *
+     * @return void
+     */
+    public function test_set_auto_cleanup_days_stores_value() {
+        $result = $this->settings->set_auto_cleanup_days(60);
+        $this->assertTrue($result);
+        $this->assertEquals(60, $this->settings->get_auto_cleanup_days());
+    }
+
+    /**
+     * Test set_auto_cleanup_days enforces minimum of 1 day
+     *
+     * @return void
+     */
+    public function test_set_auto_cleanup_days_enforces_minimum() {
+        $this->settings->set_auto_cleanup_days(0);
+        $this->assertEquals(1, $this->settings->get_auto_cleanup_days());
+
+        $this->settings->set_auto_cleanup_days(-10);
+        $this->assertEquals(1, $this->settings->get_auto_cleanup_days());
+    }
+
+    /**
+     * Test set_auto_cleanup_days accepts large values
+     *
+     * @return void
+     */
+    public function test_set_auto_cleanup_days_accepts_large_values() {
+        $this->settings->set_auto_cleanup_days(365);
+        $this->assertEquals(365, $this->settings->get_auto_cleanup_days());
+
+        $this->settings->set_auto_cleanup_days(1000);
+        $this->assertEquals(1000, $this->settings->get_auto_cleanup_days());
+    }
+
+    /**
+     * Test set_auto_cleanup_days converts to integer
+     *
+     * @return void
+     */
+    public function test_set_auto_cleanup_days_converts_to_integer() {
+        $this->settings->set_auto_cleanup_days('45');
+        $this->assertIsInt($this->settings->get_auto_cleanup_days());
+        $this->assertEquals(45, $this->settings->get_auto_cleanup_days());
+
+        $this->settings->set_auto_cleanup_days(30.7);
+        $this->assertEquals(30, $this->settings->get_auto_cleanup_days());
+    }
+
+    /**
+     * Test cleanup settings work independently
+     *
+     * @return void
+     */
+    public function test_cleanup_settings_work_independently() {
+        // Disabled with custom days
+        $this->settings->set_auto_cleanup_enabled(false);
+        $this->settings->set_auto_cleanup_days(30);
+
+        $this->assertFalse($this->settings->get_auto_cleanup_enabled());
+        $this->assertEquals(30, $this->settings->get_auto_cleanup_days());
+
+        // Enabled with different days
+        $this->settings->set_auto_cleanup_enabled(true);
+        $this->settings->set_auto_cleanup_days(120);
+
+        $this->assertTrue($this->settings->get_auto_cleanup_enabled());
+        $this->assertEquals(120, $this->settings->get_auto_cleanup_days());
+    }
+
+    // ========== Phase 5 Integration Tests ==========
+
+    /**
+     * Test complete Phase 5 workflow
+     *
+     * @return void
+     */
+    public function test_phase_5_complete_workflow() {
+        // Step 1: Enable PDF auto-save
+        $this->settings->set_auto_save_pdf(true);
+        $this->assertTrue($this->settings->get_auto_save_pdf());
+
+        // Step 2: Enable email attachments
+        $this->settings->set_attach_to_order_completed(true);
+        $this->settings->set_attach_to_customer_invoice(true);
+
+        $this->assertTrue($this->settings->get_attach_to_order_completed());
+        $this->assertTrue($this->settings->get_attach_to_customer_invoice());
+
+        // Step 3: Configure cleanup
+        $this->settings->set_auto_cleanup_enabled(true);
+        $this->settings->set_auto_cleanup_days(60);
+
+        $this->assertTrue($this->settings->get_auto_cleanup_enabled());
+        $this->assertEquals(60, $this->settings->get_auto_cleanup_days());
+
+        // Verify all settings persist
+        $this->assertTrue($this->settings->get_auto_save_pdf());
+        $this->assertTrue($this->settings->get_attach_to_order_completed());
+        $this->assertTrue($this->settings->get_attach_to_customer_invoice());
+        $this->assertTrue($this->settings->get_auto_cleanup_enabled());
+        $this->assertEquals(60, $this->settings->get_auto_cleanup_days());
+    }
+
     /**
      * Test all public methods are covered
      *
@@ -535,6 +827,20 @@ class SettingsTest extends TestCase {
             'should_show_welcome',
             'mark_welcome_shown',
             'validate_api_key',
+            // Phase 3
+            'get_auto_save_pdf',
+            'set_auto_save_pdf',
+            'get_pdf_storage_path',
+            // Phase 5.1
+            'get_attach_to_order_completed',
+            'set_attach_to_order_completed',
+            'get_attach_to_customer_invoice',
+            'set_attach_to_customer_invoice',
+            // Phase 5.3
+            'get_auto_cleanup_enabled',
+            'set_auto_cleanup_enabled',
+            'get_auto_cleanup_days',
+            'set_auto_cleanup_days',
         ];
 
         foreach ($methods as $method) {

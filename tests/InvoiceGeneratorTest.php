@@ -493,4 +493,242 @@ class InvoiceGeneratorTest extends TestCase {
         // Cleanup
         unset($mock_orders[112], $mock_orders[113]);
     }
+
+    // ========== Email Attachment Tests (Phase 5.1) ==========
+
+    /**
+     * Test attach_pdf_to_email returns unchanged when order is invalid
+     *
+     * @return void
+     */
+    public function test_attach_pdf_to_email_returns_unchanged_for_invalid_order() {
+        $attachments = array('/path/to/existing.pdf');
+
+        $result = $this->generator->attach_pdf_to_email($attachments, 'customer_completed_order', null);
+
+        $this->assertEquals($attachments, $result);
+        $this->assertCount(1, $result);
+    }
+
+    /**
+     * Test attach_pdf_to_email returns unchanged when order has no invoice
+     *
+     * @return void
+     */
+    public function test_attach_pdf_to_email_returns_unchanged_when_no_invoice() {
+        global $mock_orders;
+
+        $order = new WC_Order(300);
+        $mock_orders[300] = $order;
+
+        $attachments = array();
+
+        $result = $this->generator->attach_pdf_to_email($attachments, 'customer_completed_order', $order);
+
+        $this->assertEquals($attachments, $result);
+        $this->assertCount(0, $result);
+
+        unset($mock_orders[300]);
+    }
+
+    /**
+     * Test attach_pdf_to_email returns unchanged when setting disabled
+     *
+     * @return void
+     */
+    public function test_attach_pdf_to_email_skips_when_setting_disabled() {
+        global $mock_orders;
+
+        $order = new WC_Order(301);
+        $order->add_meta_data('_b2brouter_invoice_id', 'inv-test', true);
+        $mock_orders[301] = $order;
+
+        $this->mock_settings->method('get_attach_to_order_completed')
+                           ->willReturn(false);
+
+        $attachments = array();
+
+        $result = $this->generator->attach_pdf_to_email($attachments, 'customer_completed_order', $order);
+
+        $this->assertEquals($attachments, $result);
+        $this->assertCount(0, $result);
+
+        unset($mock_orders[301]);
+    }
+
+    /**
+     * Test attach_pdf_to_email skips unknown email types
+     *
+     * @return void
+     */
+    public function test_attach_pdf_to_email_skips_unknown_email_types() {
+        global $mock_orders;
+
+        $order = new WC_Order(302);
+        $order->add_meta_data('_b2brouter_invoice_id', 'inv-test', true);
+        $mock_orders[302] = $order;
+
+        $this->mock_settings->method('get_attach_to_order_completed')
+                           ->willReturn(true);
+
+        $attachments = array();
+
+        // Unknown email type
+        $result = $this->generator->attach_pdf_to_email($attachments, 'new_order', $order);
+
+        $this->assertEquals($attachments, $result);
+        $this->assertCount(0, $result);
+
+        unset($mock_orders[302]);
+    }
+
+    /**
+     * Test attach_pdf_to_email checks correct setting for order_completed
+     *
+     * @return void
+     */
+    public function test_attach_pdf_to_email_checks_order_completed_setting() {
+        global $mock_orders;
+
+        $order = new WC_Order(303);
+        $order->add_meta_data('_b2brouter_invoice_id', 'inv-test', true);
+        $mock_orders[303] = $order;
+
+        // Enable order_completed, disable customer_invoice
+        $this->mock_settings->method('get_attach_to_order_completed')
+                           ->willReturn(true);
+        $this->mock_settings->method('get_attach_to_customer_invoice')
+                           ->willReturn(false);
+
+        $attachments = array();
+
+        // Should NOT attach for customer_invoice (disabled)
+        $result = $this->generator->attach_pdf_to_email($attachments, 'customer_invoice', $order);
+        $this->assertCount(0, $result);
+
+        unset($mock_orders[303]);
+    }
+
+    /**
+     * Test attach_pdf_to_email checks correct setting for customer_invoice
+     *
+     * @return void
+     */
+    public function test_attach_pdf_to_email_checks_customer_invoice_setting() {
+        global $mock_orders;
+
+        $order = new WC_Order(304);
+        $order->add_meta_data('_b2brouter_invoice_id', 'inv-test', true);
+        $mock_orders[304] = $order;
+
+        // Disable order_completed, enable customer_invoice
+        $this->mock_settings->method('get_attach_to_order_completed')
+                           ->willReturn(false);
+        $this->mock_settings->method('get_attach_to_customer_invoice')
+                           ->willReturn(true);
+
+        $attachments = array();
+
+        // Should NOT attach for customer_completed_order (disabled)
+        $result = $this->generator->attach_pdf_to_email($attachments, 'customer_completed_order', $order);
+        $this->assertCount(0, $result);
+
+        unset($mock_orders[304]);
+    }
+
+    // ========== Cleanup Tests (Phase 5.3) ==========
+
+    /**
+     * Test cleanup_old_pdfs returns zero when directory doesn't exist
+     *
+     * @return void
+     */
+    public function test_cleanup_old_pdfs_returns_zero_when_no_directory() {
+        $this->mock_settings->method('get_pdf_storage_path')
+                           ->willReturn('/nonexistent/path');
+
+        $result = $this->generator->cleanup_old_pdfs(90);
+
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('deleted', $result);
+        $this->assertArrayHasKey('errors', $result);
+        $this->assertEquals(0, $result['deleted']);
+        $this->assertEquals(0, $result['errors']);
+    }
+
+    /**
+     * Test cleanup_old_pdfs returns zero when no PDF files
+     *
+     * @return void
+     */
+    public function test_cleanup_old_pdfs_returns_zero_when_no_files() {
+        // Use a real temporary directory with no PDFs
+        $temp_dir = sys_get_temp_dir() . '/b2brouter-test-' . uniqid();
+        mkdir($temp_dir);
+
+        $this->mock_settings->method('get_pdf_storage_path')
+                           ->willReturn($temp_dir);
+
+        $result = $this->generator->cleanup_old_pdfs(90);
+
+        $this->assertEquals(0, $result['deleted']);
+        $this->assertEquals(0, $result['errors']);
+
+        // Cleanup
+        rmdir($temp_dir);
+    }
+
+    /**
+     * Test cleanup_old_pdfs accepts custom days parameter
+     *
+     * @return void
+     */
+    public function test_cleanup_old_pdfs_accepts_custom_days() {
+        $this->mock_settings->method('get_pdf_storage_path')
+                           ->willReturn('/nonexistent/path');
+
+        // Should not throw error with different days values
+        $result30 = $this->generator->cleanup_old_pdfs(30);
+        $result90 = $this->generator->cleanup_old_pdfs(90);
+        $result365 = $this->generator->cleanup_old_pdfs(365);
+
+        $this->assertIsArray($result30);
+        $this->assertIsArray($result90);
+        $this->assertIsArray($result365);
+    }
+
+    /**
+     * Test cleanup_old_pdfs default parameter is 90 days
+     *
+     * @return void
+     */
+    public function test_cleanup_old_pdfs_default_is_90_days() {
+        $this->mock_settings->method('get_pdf_storage_path')
+                           ->willReturn('/nonexistent/path');
+
+        // Call without parameter (should default to 90)
+        $result = $this->generator->cleanup_old_pdfs();
+
+        $this->assertIsArray($result);
+        $this->assertEquals(0, $result['deleted']);
+        $this->assertEquals(0, $result['errors']);
+    }
+
+    /**
+     * Test cleanup_old_pdfs result structure
+     *
+     * @return void
+     */
+    public function test_cleanup_old_pdfs_returns_correct_structure() {
+        $this->mock_settings->method('get_pdf_storage_path')
+                           ->willReturn('/nonexistent/path');
+
+        $result = $this->generator->cleanup_old_pdfs(60);
+
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('deleted', $result);
+        $this->assertArrayHasKey('errors', $result);
+        $this->assertIsInt($result['deleted']);
+        $this->assertIsInt($result['errors']);
+    }
 }

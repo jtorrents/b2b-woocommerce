@@ -514,6 +514,73 @@ if (!function_exists('checked')) {
     }
 }
 
+// Global storage for cron events (Phase 5)
+global $wp_cron_events;
+$wp_cron_events = array();
+
+if (!function_exists('wp_next_scheduled')) {
+    /**
+     * Mock wp_next_scheduled function
+     *
+     * @param string $hook Hook name
+     * @param array $args Arguments
+     * @return false|int Timestamp or false
+     */
+    function wp_next_scheduled($hook, $args = array()) {
+        global $wp_cron_events;
+        if (isset($wp_cron_events[$hook])) {
+            return $wp_cron_events[$hook]['timestamp'];
+        }
+        return false;
+    }
+}
+
+if (!function_exists('wp_schedule_event')) {
+    /**
+     * Mock wp_schedule_event function
+     *
+     * @param int $timestamp Timestamp
+     * @param string $recurrence Recurrence
+     * @param string $hook Hook name
+     * @param array $args Arguments
+     * @return bool Success
+     */
+    function wp_schedule_event($timestamp, $recurrence, $hook, $args = array()) {
+        global $wp_cron_events;
+        $wp_cron_events[$hook] = array(
+            'timestamp' => $timestamp,
+            'recurrence' => $recurrence,
+            'args' => $args
+        );
+        return true;
+    }
+}
+
+if (!function_exists('wp_upload_dir')) {
+    /**
+     * Mock wp_upload_dir function
+     *
+     * @param string $time Time
+     * @return array Upload directory info
+     */
+    function wp_upload_dir($time = null) {
+        $upload_path = sys_get_temp_dir() . '/wp-content/uploads';
+        return array(
+            'path' => $upload_path . '/2025/11',
+            'url' => 'http://example.com/wp-content/uploads/2025/11',
+            'subdir' => '/2025/11',
+            'basedir' => $upload_path,
+            'baseurl' => 'http://example.com/wp-content/uploads',
+            'error' => false,
+        );
+    }
+}
+
+// Constants for Phase 5
+if (!defined('DAY_IN_SECONDS')) {
+    define('DAY_IN_SECONDS', 86400);
+}
+
 // Define B2BROUTER_WC_PLUGIN_BASENAME constant for plugin action links
 if (!defined('B2BROUTER_WC_PLUGIN_BASENAME')) {
     define('B2BROUTER_WC_PLUGIN_BASENAME', 'b2brouter-woocommerce/b2brouter-woocommerce.php');
