@@ -170,13 +170,13 @@ class InvoiceGeneratorTest extends TestCase {
      * @return void
      */
     public function test_generate_invoice_success() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         // Create a mock order
         $order = new WC_Order(100);
         $item = new WC_Order_Item_Product('Test Product');
         $order->add_item($item);
-        $mock_orders[100] = $order;
+        $wc_mock_orders[100] = $order;
 
         // Configure mock settings
         $this->mock_settings->method('get_api_key')
@@ -208,7 +208,7 @@ class InvoiceGeneratorTest extends TestCase {
         $this->assertNotEmpty($order->get_meta('_b2brouter_invoice_date'));
 
         // Cleanup
-        unset($mock_orders[100]);
+        unset($wc_mock_orders[100]);
     }
 
     /**
@@ -217,12 +217,12 @@ class InvoiceGeneratorTest extends TestCase {
      * @return void
      */
     public function test_generate_invoice_already_exists() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         // Create order with existing invoice
         $order = new WC_Order(101);
         $order->add_meta_data('_b2brouter_invoice_id', 'existing-invoice-id', true);
-        $mock_orders[101] = $order;
+        $wc_mock_orders[101] = $order;
 
         $this->mock_settings->method('get_api_key')
                            ->willReturn('valid-api-key');
@@ -235,7 +235,7 @@ class InvoiceGeneratorTest extends TestCase {
         $this->assertStringContainsString('already generated', $result['message']);
 
         // Cleanup
-        unset($mock_orders[101]);
+        unset($wc_mock_orders[101]);
     }
 
     /**
@@ -244,10 +244,10 @@ class InvoiceGeneratorTest extends TestCase {
      * @return void
      */
     public function test_generate_invoice_no_api_key() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         $order = new WC_Order(102);
-        $mock_orders[102] = $order;
+        $wc_mock_orders[102] = $order;
 
         // API key is empty
         $this->mock_settings->method('get_api_key')
@@ -260,7 +260,7 @@ class InvoiceGeneratorTest extends TestCase {
         $this->assertStringContainsString('API key not configured', $result['message']);
 
         // Cleanup
-        unset($mock_orders[102]);
+        unset($wc_mock_orders[102]);
     }
 
     /**
@@ -269,18 +269,18 @@ class InvoiceGeneratorTest extends TestCase {
      * @return void
      */
     public function test_has_invoice_returns_true_when_invoice_exists() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         $order = new WC_Order(103);
         $order->add_meta_data('_b2brouter_invoice_id', 'inv-123', true);
-        $mock_orders[103] = $order;
+        $wc_mock_orders[103] = $order;
 
         $result = $this->generator->has_invoice(103);
 
         $this->assertTrue($result);
 
         // Cleanup
-        unset($mock_orders[103]);
+        unset($wc_mock_orders[103]);
     }
 
     /**
@@ -289,17 +289,17 @@ class InvoiceGeneratorTest extends TestCase {
      * @return void
      */
     public function test_has_invoice_returns_false_when_no_invoice() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         $order = new WC_Order(104);
-        $mock_orders[104] = $order;
+        $wc_mock_orders[104] = $order;
 
         $result = $this->generator->has_invoice(104);
 
         $this->assertFalse($result);
 
         // Cleanup
-        unset($mock_orders[104]);
+        unset($wc_mock_orders[104]);
     }
 
     /**
@@ -308,18 +308,18 @@ class InvoiceGeneratorTest extends TestCase {
      * @return void
      */
     public function test_get_invoice_id_returns_id_when_exists() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         $order = new WC_Order(105);
         $order->add_meta_data('_b2brouter_invoice_id', 'inv-456', true);
-        $mock_orders[105] = $order;
+        $wc_mock_orders[105] = $order;
 
         $result = $this->generator->get_invoice_id(105);
 
         $this->assertEquals('inv-456', $result);
 
         // Cleanup
-        unset($mock_orders[105]);
+        unset($wc_mock_orders[105]);
     }
 
     /**
@@ -328,17 +328,17 @@ class InvoiceGeneratorTest extends TestCase {
      * @return void
      */
     public function test_get_invoice_id_returns_empty_when_no_invoice() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         $order = new WC_Order(106);
-        $mock_orders[106] = $order;
+        $wc_mock_orders[106] = $order;
 
         $result = $this->generator->get_invoice_id(106);
 
         $this->assertEmpty($result);
 
         // Cleanup
-        unset($mock_orders[106]);
+        unset($wc_mock_orders[106]);
     }
 
     /**
@@ -347,7 +347,7 @@ class InvoiceGeneratorTest extends TestCase {
      * @return void
      */
     public function test_generate_invoice_uses_company_name_fallback() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         // Order with no first/last name but has company
         $order = new WC_Order(107);
@@ -356,7 +356,7 @@ class InvoiceGeneratorTest extends TestCase {
         $order->set_billing_company('Acme Corp');
         $item = new WC_Order_Item_Product('Product');
         $order->add_item($item);
-        $mock_orders[107] = $order;
+        $wc_mock_orders[107] = $order;
 
         $this->mock_settings->method('get_api_key')
                            ->willReturn('valid-api-key');
@@ -375,7 +375,7 @@ class InvoiceGeneratorTest extends TestCase {
         $this->assertEquals(354754, $result['invoice_id']);
 
         // Cleanup
-        unset($mock_orders[107]);
+        unset($wc_mock_orders[107]);
     }
 
     /**
@@ -384,14 +384,14 @@ class InvoiceGeneratorTest extends TestCase {
      * @return void
      */
     public function test_generate_invoice_includes_shipping() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         $order = new WC_Order(108);
         $order->set_shipping_total(10.00);
         $order->set_shipping_tax(2.00);
         $item = new WC_Order_Item_Product('Product');
         $order->add_item($item);
-        $mock_orders[108] = $order;
+        $wc_mock_orders[108] = $order;
 
         $this->mock_settings->method('get_api_key')
                            ->willReturn('valid-api-key');
@@ -410,7 +410,7 @@ class InvoiceGeneratorTest extends TestCase {
         $this->assertEquals(354754, $result['invoice_id']);
 
         // Cleanup
-        unset($mock_orders[108]);
+        unset($wc_mock_orders[108]);
     }
 
     /**
@@ -419,14 +419,14 @@ class InvoiceGeneratorTest extends TestCase {
      * @return void
      */
     public function test_generate_invoice_calculates_item_tax_rate() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         $order = new WC_Order(109);
         $item = new WC_Order_Item_Product('Product with Tax');
         $item->set_total(100.00);
         $item->set_taxes(array('total' => array(10.00, 5.00))); // 15% total tax
         $order->add_item($item);
-        $mock_orders[109] = $order;
+        $wc_mock_orders[109] = $order;
 
         $this->mock_settings->method('get_api_key')
                            ->willReturn('valid-api-key');
@@ -445,7 +445,7 @@ class InvoiceGeneratorTest extends TestCase {
         $this->assertEquals(354754, $result['invoice_id']);
 
         // Cleanup
-        unset($mock_orders[109]);
+        unset($wc_mock_orders[109]);
     }
 
     /**
@@ -454,14 +454,14 @@ class InvoiceGeneratorTest extends TestCase {
      * @return void
      */
     public function test_generate_invoice_handles_zero_price_item() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         $order = new WC_Order(110);
         $item = new WC_Order_Item_Product('Free Product');
         $item->set_total(0.00);
         $item->set_taxes(array('total' => array(0)));
         $order->add_item($item);
-        $mock_orders[110] = $order;
+        $wc_mock_orders[110] = $order;
 
         $this->mock_settings->method('get_api_key')
                            ->willReturn('valid-api-key');
@@ -480,7 +480,7 @@ class InvoiceGeneratorTest extends TestCase {
         $this->assertEquals(354754, $result['invoice_id']);
 
         // Cleanup
-        unset($mock_orders[110]);
+        unset($wc_mock_orders[110]);
     }
 
     /**
@@ -489,11 +489,11 @@ class InvoiceGeneratorTest extends TestCase {
      * @return void
      */
     public function test_generate_invoice_adds_note_on_error() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         // Order exists but no invoice ID
         $order = new WC_Order(111);
-        $mock_orders[111] = $order;
+        $wc_mock_orders[111] = $order;
 
         // No API key configured
         $this->mock_settings->method('get_api_key')
@@ -504,7 +504,7 @@ class InvoiceGeneratorTest extends TestCase {
         $this->assertFalse($result['success']);
 
         // Cleanup
-        unset($mock_orders[111]);
+        unset($wc_mock_orders[111]);
     }
 
     /**
@@ -513,18 +513,18 @@ class InvoiceGeneratorTest extends TestCase {
      * @return void
      */
     public function test_client_is_cached_across_calls() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         // Create two orders
         $order1 = new WC_Order(112);
         $item1 = new WC_Order_Item_Product('Product 1');
         $order1->add_item($item1);
-        $mock_orders[112] = $order1;
+        $wc_mock_orders[112] = $order1;
 
         $order2 = new WC_Order(113);
         $item2 = new WC_Order_Item_Product('Product 2');
         $order2->add_item($item2);
-        $mock_orders[113] = $order2;
+        $wc_mock_orders[113] = $order2;
 
         $this->mock_settings->method('get_api_key')
                            ->willReturn('valid-api-key');
@@ -547,7 +547,7 @@ class InvoiceGeneratorTest extends TestCase {
         $this->assertEquals(354754, $result2['invoice_id']);
 
         // Cleanup
-        unset($mock_orders[112], $mock_orders[113]);
+        unset($wc_mock_orders[112], $wc_mock_orders[113]);
     }
 
     // ========== Email Attachment Tests (Phase 5.1) ==========
@@ -572,10 +572,10 @@ class InvoiceGeneratorTest extends TestCase {
      * @return void
      */
     public function test_attach_pdf_to_email_returns_unchanged_when_no_invoice() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         $order = new WC_Order(300);
-        $mock_orders[300] = $order;
+        $wc_mock_orders[300] = $order;
 
         $attachments = array();
 
@@ -584,7 +584,7 @@ class InvoiceGeneratorTest extends TestCase {
         $this->assertEquals($attachments, $result);
         $this->assertCount(0, $result);
 
-        unset($mock_orders[300]);
+        unset($wc_mock_orders[300]);
     }
 
     /**
@@ -593,11 +593,11 @@ class InvoiceGeneratorTest extends TestCase {
      * @return void
      */
     public function test_attach_pdf_to_email_skips_when_setting_disabled() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         $order = new WC_Order(301);
         $order->add_meta_data('_b2brouter_invoice_id', 'inv-test', true);
-        $mock_orders[301] = $order;
+        $wc_mock_orders[301] = $order;
 
         $this->mock_settings->method('get_attach_to_order_completed')
                            ->willReturn(false);
@@ -609,7 +609,7 @@ class InvoiceGeneratorTest extends TestCase {
         $this->assertEquals($attachments, $result);
         $this->assertCount(0, $result);
 
-        unset($mock_orders[301]);
+        unset($wc_mock_orders[301]);
     }
 
     /**
@@ -618,11 +618,11 @@ class InvoiceGeneratorTest extends TestCase {
      * @return void
      */
     public function test_attach_pdf_to_email_skips_unknown_email_types() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         $order = new WC_Order(302);
         $order->add_meta_data('_b2brouter_invoice_id', 'inv-test', true);
-        $mock_orders[302] = $order;
+        $wc_mock_orders[302] = $order;
 
         $this->mock_settings->method('get_attach_to_order_completed')
                            ->willReturn(true);
@@ -635,7 +635,7 @@ class InvoiceGeneratorTest extends TestCase {
         $this->assertEquals($attachments, $result);
         $this->assertCount(0, $result);
 
-        unset($mock_orders[302]);
+        unset($wc_mock_orders[302]);
     }
 
     /**
@@ -644,11 +644,11 @@ class InvoiceGeneratorTest extends TestCase {
      * @return void
      */
     public function test_attach_pdf_to_email_checks_order_completed_setting() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         $order = new WC_Order(303);
         $order->add_meta_data('_b2brouter_invoice_id', 'inv-test', true);
-        $mock_orders[303] = $order;
+        $wc_mock_orders[303] = $order;
 
         // Enable order_completed, disable customer_invoice
         $this->mock_settings->method('get_attach_to_order_completed')
@@ -662,7 +662,7 @@ class InvoiceGeneratorTest extends TestCase {
         $result = $this->generator->attach_pdf_to_email($attachments, 'customer_invoice', $order);
         $this->assertCount(0, $result);
 
-        unset($mock_orders[303]);
+        unset($wc_mock_orders[303]);
     }
 
     /**
@@ -671,11 +671,11 @@ class InvoiceGeneratorTest extends TestCase {
      * @return void
      */
     public function test_attach_pdf_to_email_checks_customer_invoice_setting() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         $order = new WC_Order(304);
         $order->add_meta_data('_b2brouter_invoice_id', 'inv-test', true);
-        $mock_orders[304] = $order;
+        $wc_mock_orders[304] = $order;
 
         // Disable order_completed, enable customer_invoice
         $this->mock_settings->method('get_attach_to_order_completed')
@@ -689,7 +689,7 @@ class InvoiceGeneratorTest extends TestCase {
         $result = $this->generator->attach_pdf_to_email($attachments, 'customer_completed_order', $order);
         $this->assertCount(0, $result);
 
-        unset($mock_orders[304]);
+        unset($wc_mock_orders[304]);
     }
 
     // ========== Cleanup Tests (Phase 5.3) ==========
@@ -862,10 +862,10 @@ class InvoiceGeneratorTest extends TestCase {
      * @return void
      */
     public function test_save_invoice_pdf_fails_without_invoice() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         $order = new WC_Order(400);
-        $mock_orders[400] = $order;
+        $wc_mock_orders[400] = $order;
 
         $result = $this->generator->save_invoice_pdf(400);
 
@@ -873,7 +873,7 @@ class InvoiceGeneratorTest extends TestCase {
         $this->assertFalse($result['success']);
         $this->assertStringContainsString('No invoice found', $result['message']);
 
-        unset($mock_orders[400]);
+        unset($wc_mock_orders[400]);
     }
 
     /**
@@ -897,10 +897,10 @@ class InvoiceGeneratorTest extends TestCase {
      * @return void
      */
     public function test_save_invoice_pdf_accepts_force_download_parameter() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         $order = new WC_Order(401);
-        $mock_orders[401] = $order;
+        $wc_mock_orders[401] = $order;
 
         // Test without forcing
         $result1 = $this->generator->save_invoice_pdf(401, false);
@@ -910,7 +910,7 @@ class InvoiceGeneratorTest extends TestCase {
         $result2 = $this->generator->save_invoice_pdf(401, true);
         $this->assertIsArray($result2);
 
-        unset($mock_orders[401]);
+        unset($wc_mock_orders[401]);
     }
 
     // ========== PDF Stream Tests (Phase 4) ==========
@@ -933,17 +933,17 @@ class InvoiceGeneratorTest extends TestCase {
      * @return void
      */
     public function test_stream_invoice_pdf_fails_without_invoice() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         $order = new WC_Order(402);
-        $mock_orders[402] = $order;
+        $wc_mock_orders[402] = $order;
 
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('wp_die called');
 
         $this->generator->stream_invoice_pdf(402);
 
-        unset($mock_orders[402]);
+        unset($wc_mock_orders[402]);
     }
 
     /**
@@ -952,10 +952,10 @@ class InvoiceGeneratorTest extends TestCase {
      * @return void
      */
     public function test_stream_invoice_pdf_accepts_download_parameter() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         $order = new WC_Order(403);
-        $mock_orders[403] = $order;
+        $wc_mock_orders[403] = $order;
 
         // Both modes should call wp_die when no invoice exists
         $this->expectException(Exception::class);
@@ -964,7 +964,7 @@ class InvoiceGeneratorTest extends TestCase {
         // Test view mode (will throw exception)
         $this->generator->stream_invoice_pdf(403, false);
 
-        unset($mock_orders[403]);
+        unset($wc_mock_orders[403]);
     }
 
     // ========== PDF Delete Tests (Phase 5) ==========
@@ -987,17 +987,17 @@ class InvoiceGeneratorTest extends TestCase {
      * @return void
      */
     public function test_delete_invoice_pdf_returns_false_without_cached_pdf() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         $order = new WC_Order(404);
-        $mock_orders[404] = $order;
+        $wc_mock_orders[404] = $order;
 
         $result = $this->generator->delete_invoice_pdf(404);
 
         $this->assertIsBool($result);
         $this->assertFalse($result);
 
-        unset($mock_orders[404]);
+        unset($wc_mock_orders[404]);
     }
 
     /**

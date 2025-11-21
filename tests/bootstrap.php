@@ -158,11 +158,11 @@ if (!function_exists('wc_get_order')) {
      * @return WC_Order|false Returns mock order or false
      */
     function wc_get_order($order_id) {
-        global $mock_orders;
-        if (isset($mock_orders[$order_id])) {
-            return $mock_orders[$order_id];
+        global $wc_mock_orders;
+        if (isset($wc_mock_orders[$order_id])) {
+            return $wc_mock_orders[$order_id];
         }
-        return false;
+        return null;
     }
 }
 
@@ -661,6 +661,7 @@ if (!class_exists('WC_Order')) {
         }
 
         public function get_id() { return $this->id; }
+        public function get_type() { return 'shop_order'; }
         public function get_billing_first_name() { return $this->data['billing_first_name']; }
         public function get_billing_last_name() { return $this->data['billing_last_name']; }
         public function get_billing_company() { return $this->data['billing_company']; }
@@ -722,7 +723,23 @@ if (!class_exists('WC_Order')) {
         }
 
         public function get_item_subtotal($item, $inc_tax = false, $round = true) {
-            return 10.00; // Mock price
+            // Calculate from item total and quantity
+            if (method_exists($item, 'get_total') && method_exists($item, 'get_quantity')) {
+                $total = $item->get_total();
+                $quantity = $item->get_quantity();
+                if ($quantity != 0) {
+                    return abs($total / $quantity);
+                }
+            }
+            return 10.00; // Fallback mock price
+        }
+
+        public function get_refunds() {
+            return array(); // Return empty array by default
+        }
+
+        public function get_edit_order_url() {
+            return admin_url('post.php?post=' . $this->get_id() . '&action=edit');
         }
     }
 }
@@ -967,6 +984,46 @@ if (!class_exists('WC_Customer')) {
     }
 }
 
+// Mock WC_Order_Refund class
+if (!class_exists('WC_Order_Refund')) {
+    /**
+     * Mock WC_Order_Refund class
+     */
+    class WC_Order_Refund extends WC_Order {
+        private $parent_id = 0;
+        private $reason = '';
+        private $items = array();
+
+        public function get_type() {
+            return 'shop_order_refund';
+        }
+
+        public function get_parent_id() {
+            return $this->parent_id;
+        }
+
+        public function set_parent_id($parent_id) {
+            $this->parent_id = $parent_id;
+        }
+
+        public function get_reason() {
+            return $this->reason;
+        }
+
+        public function set_reason($reason) {
+            $this->reason = $reason;
+        }
+
+        public function get_items($type = 'line_item') {
+            return $this->items;
+        }
+
+        public function set_items($items) {
+            $this->items = $items;
+        }
+    }
+}
+
 // Global user meta storage
 global $wp_user_meta;
 $wp_user_meta = array();
@@ -1019,3 +1076,7 @@ if (!function_exists('update_user_meta')) {
 // Global $wp_filter for hook testing
 global $wp_filter;
 $wp_filter = array();
+
+// Global mock orders storage for tests
+global $wc_mock_orders;
+$wc_mock_orders = array();

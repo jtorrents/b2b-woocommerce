@@ -32,6 +32,7 @@ class Settings {
     const OPTION_PDF_STORAGE_PATH = 'b2brouter_pdf_storage_path';
     const OPTION_ATTACH_TO_ORDER_COMPLETED = 'b2brouter_attach_to_order_completed';
     const OPTION_ATTACH_TO_CUSTOMER_INVOICE = 'b2brouter_attach_to_customer_invoice';
+    const OPTION_ATTACH_TO_REFUNDED_ORDER = 'b2brouter_attach_to_refunded_order';
     const OPTION_AUTO_CLEANUP_ENABLED = 'b2brouter_auto_cleanup_enabled';
     const OPTION_AUTO_CLEANUP_DAYS = 'b2brouter_auto_cleanup_days';
 
@@ -370,6 +371,27 @@ class Settings {
      */
     public function set_attach_to_customer_invoice($enabled) {
         return update_option(self::OPTION_ATTACH_TO_CUSTOMER_INVOICE, $enabled ? '1' : '0');
+    }
+
+    /**
+     * Get attach to refunded order email setting
+     *
+     * @since 1.0.0
+     * @return bool
+     */
+    public function get_attach_to_refunded_order() {
+        return get_option(self::OPTION_ATTACH_TO_REFUNDED_ORDER, '0') === '1';
+    }
+
+    /**
+     * Set attach to refunded order email setting
+     *
+     * @since 1.0.0
+     * @param bool $enabled
+     * @return bool
+     */
+    public function set_attach_to_refunded_order($enabled) {
+        return update_option(self::OPTION_ATTACH_TO_REFUNDED_ORDER, $enabled ? '1' : '0');
     }
 
     /**

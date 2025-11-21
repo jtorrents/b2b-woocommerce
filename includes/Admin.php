@@ -342,6 +342,7 @@ class Admin {
         $auto_save_pdf = $this->settings->get_auto_save_pdf();
         $attach_to_completed = $this->settings->get_attach_to_order_completed();
         $attach_to_invoice = $this->settings->get_attach_to_customer_invoice();
+        $attach_to_refunded = $this->settings->get_attach_to_refunded_order();
         $auto_cleanup_enabled = $this->settings->get_auto_cleanup_enabled();
         $auto_cleanup_days = $this->settings->get_auto_cleanup_days();
         $transaction_count = $this->settings->get_transaction_count();
@@ -382,6 +383,11 @@ class Admin {
                 isset($_POST['b2brouter_attach_to_customer_invoice']) && $_POST['b2brouter_attach_to_customer_invoice'] === '1'
             );
             $attach_to_invoice = $this->settings->get_attach_to_customer_invoice();
+
+            $this->settings->set_attach_to_refunded_order(
+                isset($_POST['b2brouter_attach_to_refunded_order']) && $_POST['b2brouter_attach_to_refunded_order'] === '1'
+            );
+            $attach_to_refunded = $this->settings->get_attach_to_refunded_order();
 
             // Save cleanup settings
             $this->settings->set_auto_cleanup_enabled(
@@ -576,8 +582,16 @@ class Admin {
                                            <?php checked($attach_to_invoice, true); ?>>
                                     <?php esc_html_e('Attach PDF to Customer Invoice email', 'b2brouter-woocommerce'); ?>
                                 </label>
+                                <br>
+                                <label>
+                                    <input type="checkbox"
+                                           name="b2brouter_attach_to_refunded_order"
+                                           value="1"
+                                           <?php checked($attach_to_refunded, true); ?>>
+                                    <?php esc_html_e('Attach PDF to Refunded Order email (credit note/rectificative)', 'b2brouter-woocommerce'); ?>
+                                </label>
                                 <p class="description">
-                                    <?php esc_html_e('Automatically attach invoice PDFs to customer emails. "Order Completed" is sent when orders are fulfilled. "Customer Invoice" is sent for pending/unpaid orders or when manually sent from admin panel.', 'b2brouter-woocommerce'); ?>
+                                    <?php esc_html_e('Automatically attach invoice PDFs to customer emails. "Order Completed" is sent when orders are fulfilled. "Customer Invoice" is sent for pending/unpaid orders or when manually sent from admin panel. "Refunded Order" is sent when orders are refunded.', 'b2brouter-woocommerce'); ?>
                                 </p>
                             </fieldset>
                         </td>

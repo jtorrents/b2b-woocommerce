@@ -22,6 +22,14 @@ if (!defined('ABSPATH')) {
 class Invoice_Generator {
 
     /**
+     * Countries that use rectificative invoices (negative amounts) instead of credit notes
+     *
+     * @since 1.0.0
+     * @var array
+     */
+    const RECTIFICATIVE_COUNTRIES = array('ES'); // Spain uses rectificative invoices
+
+    /**
      * Settings instance
      *
      * @since 1.0.0
@@ -77,24 +85,37 @@ class Invoice_Generator {
     }
 
     /**
-     * Generate invoice from WooCommerce order
+     * Generate invoice from WooCommerce order or refund
      *
      * @since 1.0.0
-     * @param int $order_id The WooCommerce order ID
+     * @param int $order_id The WooCommerce order or refund ID
      * @return array{success: bool, invoice_id?: string, invoice_number?: string, message: string} Generation result
      */
     public function generate_invoice($order_id) {
         try {
-            // Get order
+            // Get order (could be regular order or refund)
             $order = wc_get_order($order_id);
 
             if (!$order) {
                 throw new \Exception(__('Order not found', 'b2brouter-woocommerce'));
             }
 
+            $is_refund = $this->is_refund($order);
+
             // Check if invoice already generated
             if ($order->get_meta('_b2brouter_invoice_id')) {
-                throw new \Exception(__('Invoice already generated for this order', 'b2brouter-woocommerce'));
+                $message = $is_refund
+                    ? __('Credit note already generated for this refund', 'b2brouter-woocommerce')
+                    : __('Invoice already generated for this order', 'b2brouter-woocommerce');
+                throw new \Exception($message);
+            }
+
+            // For refunds, validate parent order has invoice
+            if ($is_refund) {
+                $parent_invoice_info = $this->get_parent_invoice_info($order);
+                if (!$parent_invoice_info) {
+                    throw new \Exception(__('Cannot generate credit note: parent order has no invoice', 'b2brouter-woocommerce'));
+                }
             }
 
             // Get client
@@ -107,14 +128,14 @@ class Invoice_Generator {
                 throw new \Exception(__('Account ID not configured. Please validate your API key.', 'b2brouter-woocommerce'));
             }
 
-            // Prepare invoice data
+            // Prepare invoice data (handles both regular invoices and refunds)
             $invoice_data = $this->prepare_invoice_data($order);
 
-            // Create invoice via B2Brouter API
-            $invoice = $client->invoices->create($account_id, array('invoice' => $invoice_data));
+            // Add send_after_import to send invoice immediately after creation
+            $invoice_data['send_after_import'] = true;
 
-            // Send invoice
-            $client->invoices->send($invoice['id']);
+            // Create and send invoice via B2Brouter API (single call)
+            $invoice = $client->invoices->create($account_id, array('invoice' => $invoice_data));
 
             // Store invoice ID in order meta
             $order->add_meta_data('_b2brouter_invoice_id', $invoice['id'], true);
@@ -122,13 +143,23 @@ class Invoice_Generator {
             $order->add_meta_data('_b2brouter_invoice_date', current_time('mysql'), true);
             $order->save();
 
-            // Add order note
-            $order->add_order_note(
-                sprintf(
+            // Add order note with context-aware message
+            // For refunds, add note to parent order instead of refund itself
+            $note_target = $is_refund && isset($parent_invoice_info['parent_order'])
+                ? $parent_invoice_info['parent_order']
+                : $order;
+
+            $note_message = $is_refund
+                ? sprintf(
+                    __('B2Brouter credit note generated successfully. Invoice ID: %s', 'b2brouter-woocommerce'),
+                    $invoice['id']
+                  )
+                : sprintf(
                     __('B2Brouter invoice generated successfully. Invoice ID: %s', 'b2brouter-woocommerce'),
                     $invoice['id']
-                )
-            );
+                  );
+
+            $note_target->add_order_note($note_message);
 
             // Increment transaction counter
             $this->settings->increment_transaction_count();
@@ -142,17 +173,23 @@ class Invoice_Generator {
                 $pdf_result = $this->save_invoice_pdf($order_id, false);
 
                 if ($pdf_result['success']) {
-                    $order->add_order_note(
-                        __('Invoice PDF automatically downloaded and cached locally', 'b2brouter-woocommerce')
-                    );
+                    $pdf_note = $is_refund
+                        ? __('Credit note PDF automatically downloaded and cached locally', 'b2brouter-woocommerce')
+                        : __('Invoice PDF automatically downloaded and cached locally', 'b2brouter-woocommerce');
+                    $note_target->add_order_note($pdf_note);
                 }
             }
+
+            $success_message = $is_refund
+                ? __('Credit note generated successfully', 'b2brouter-woocommerce')
+                : __('Invoice generated successfully', 'b2brouter-woocommerce');
 
             return array(
                 'success' => true,
                 'invoice_id' => $invoice['id'],
                 'invoice_number' => $invoice['number'] ?? '',
-                'message' => __('Invoice generated successfully', 'b2brouter-woocommerce')
+                'message' => $success_message,
+                'is_refund' => $is_refund
             );
 
         } catch (\Exception $e) {
@@ -160,13 +197,24 @@ class Invoice_Generator {
             error_log('B2Brouter Invoice Generation Error: ' . $e->getMessage());
 
             // Add order note with error
-            if ($order) {
-                $order->add_order_note(
-                    sprintf(
+            if (isset($order) && $order) {
+                // For refunds, add error note to parent order if available
+                $error_note_target = $order;
+                if (isset($is_refund) && $is_refund && isset($parent_invoice_info['parent_order'])) {
+                    $error_note_target = $parent_invoice_info['parent_order'];
+                }
+
+                $error_message = isset($is_refund) && $is_refund
+                    ? sprintf(
+                        __('B2Brouter credit note generation failed: %s', 'b2brouter-woocommerce'),
+                        $e->getMessage()
+                      )
+                    : sprintf(
                         __('B2Brouter invoice generation failed: %s', 'b2brouter-woocommerce'),
                         $e->getMessage()
-                    )
-                );
+                      );
+
+                $error_note_target->add_order_note($error_message);
             }
 
             return array(
@@ -180,33 +228,52 @@ class Invoice_Generator {
      * Prepare invoice data from WooCommerce order
      *
      * @since 1.0.0
-     * @param \WC_Order $order The WooCommerce order
+     * @param \WC_Order|\WC_Order_Refund $order The WooCommerce order or refund
      * @return array The invoice data array for B2Brouter API
      */
     private function prepare_invoice_data($order) {
+        $is_refund = $this->is_refund($order);
+        $parent_order = null;
+        $parent_invoice_info = null;
+
+        // For refunds, get parent order and invoice info
+        if ($is_refund) {
+            $parent_invoice_info = $this->get_parent_invoice_info($order);
+            if (!$parent_invoice_info) {
+                throw new \Exception(__('Parent order has no invoice. Cannot create refund invoice.', 'b2brouter-woocommerce'));
+            }
+            $parent_order = $parent_invoice_info['parent_order'];
+        }
+
+        // Use parent order for billing details if this is a refund
+        $billing_order = $is_refund && $parent_order ? $parent_order : $order;
+
         // Get billing details
-        $billing_name = trim($order->get_billing_first_name() . ' ' . $order->get_billing_last_name());
+        $billing_name = trim($billing_order->get_billing_first_name() . ' ' . $billing_order->get_billing_last_name());
         if (empty($billing_name)) {
-            $billing_name = $order->get_billing_company();
+            $billing_name = $billing_order->get_billing_company();
         }
 
         // Prepare contact (customer) data
         $contact = array(
             'name' => $billing_name,
-            'email' => $order->get_billing_email(),
-            'country' => $order->get_billing_country(),
-            'address' => $order->get_billing_address_1(),
-            'city' => $order->get_billing_city(),
-            'postalcode' => $order->get_billing_postcode(),
+            'email' => $billing_order->get_billing_email(),
+            'country' => $billing_order->get_billing_country(),
+            'address' => $billing_order->get_billing_address_1(),
+            'city' => $billing_order->get_billing_city(),
+            'postalcode' => $billing_order->get_billing_postcode(),
         );
 
         // Add address line 2 if present
-        if ($order->get_billing_address_2()) {
-            $contact['address'] .= ', ' . $order->get_billing_address_2();
+        if ($billing_order->get_billing_address_2()) {
+            $contact['address'] .= ', ' . $billing_order->get_billing_address_2();
         }
 
         // Add TIN/VAT number if available
         $tin = Customer_Fields::get_order_tin($order);
+        if (empty($tin) && $is_refund && $parent_order) {
+            $tin = Customer_Fields::get_order_tin($parent_order);
+        }
         if (!empty($tin)) {
             $contact['tin_value'] = $tin;
             // B2BRouter uses TIN scheme 9999 for generic tax IDs
@@ -214,24 +281,55 @@ class Invoice_Generator {
             $contact['tin_scheme'] = 9999;
         }
 
+        // Determine if we should use credit notes (positive amounts) or rectificative (negative amounts)
+        $country = $billing_order->get_billing_country();
+        $is_rectificative = $this->uses_rectificative_invoices($country);
+        $amount_multiplier = ($is_refund && !$is_rectificative) ? -1 : 1;
+
         // Prepare line items
         $invoice_lines = array();
 
-        foreach ($order->get_items() as $item) {
+        // For refunds, if no items exist, use parent order items
+        $items = $order->get_items();
+        $use_parent_items = false;
+        if ($is_refund && empty($items) && $parent_order) {
+            $items = $parent_order->get_items();
+            $use_parent_items = true;
+        }
+
+        // Determine which order object to use for item calculations
+        $item_order = $use_parent_items ? $parent_order : $order;
+
+        foreach ($items as $item) {
+            $quantity = $item->get_quantity();
+            $price = (float) $item_order->get_item_subtotal($item, false, false);
+
+            // For refunds using parent items, negate the amounts for rectificative invoices
+            if ($is_refund && $use_parent_items && $is_rectificative) {
+                $quantity = -$quantity;
+                // Price stays positive for per-unit price
+            }
+
+            // For credit notes (non-rectificative), convert negative amounts to positive
+            if ($amount_multiplier === -1) {
+                $quantity = abs($quantity);
+                $price = abs($price);
+            }
+
             $line = array(
                 'description' => $item->get_name(),
-                'quantity' => $item->get_quantity(),
-                'price' => (float) $order->get_item_subtotal($item, false, false),
+                'quantity' => $quantity,
+                'price' => $price,
             );
 
             // Add taxes if present
-            $tax_rate = $this->get_item_tax_rate($item, $order);
+            $tax_rate = $this->get_item_tax_rate($item, $item_order);
             if ($tax_rate > 0) {
                 $line['taxes_attributes'] = array(
                     array(
                         'name' => 'IVA',
                         'category' => 'S',  // Standard rate
-                        'percent' => $tax_rate,
+                        'percent' => abs($tax_rate),
                     )
                 );
             }
@@ -240,20 +338,34 @@ class Invoice_Generator {
         }
 
         // Add shipping as line item if exists
-        if ($order->get_shipping_total() > 0) {
+        $shipping_total = $item_order->get_shipping_total();
+
+        // For refunds using parent items, negate shipping for rectificative invoices
+        if ($is_refund && $use_parent_items && $is_rectificative) {
+            $shipping_total = -$shipping_total;
+        }
+
+        if ($shipping_total != 0) {
+            $shipping_price = (float) $shipping_total;
+
+            // For credit notes, convert to positive
+            if ($amount_multiplier === -1) {
+                $shipping_price = abs($shipping_price);
+            }
+
             $shipping_line = array(
                 'description' => __('Shipping', 'b2brouter-woocommerce'),
                 'quantity' => 1,
-                'price' => (float) $order->get_shipping_total(),
+                'price' => $shipping_price,
             );
 
-            $shipping_tax_rate = $this->get_shipping_tax_rate($order);
+            $shipping_tax_rate = $this->get_shipping_tax_rate($item_order);
             if ($shipping_tax_rate > 0) {
                 $shipping_line['taxes_attributes'] = array(
                     array(
                         'name' => 'IVA',
                         'category' => 'S',
-                        'percent' => $shipping_tax_rate,
+                        'percent' => abs($shipping_tax_rate),
                     )
                 );
             }
@@ -262,22 +374,53 @@ class Invoice_Generator {
         }
 
         // Generate invoice number based on order
-        $invoice_number = 'INV-' . $order->get_billing_country() . '-' . date('Y') . '-' . str_pad($order->get_id(), 5, '0', STR_PAD_LEFT);
+        $invoice_prefix = $is_refund ? 'REF-' : 'INV-';
+        $invoice_number = $invoice_prefix . $billing_order->get_billing_country() . '-' . date('Y') . '-' . str_pad($order->get_id(), 5, '0', STR_PAD_LEFT);
 
-        // Prepare invoice data
+        // Determine invoice type (IssuedInvoice or IssuedSimplifiedInvoice)
+        $invoice_type = $this->get_invoice_type($order);
+
+        // Prepare base invoice data
         $invoice_data = array(
+            'type' => $invoice_type,
             'number' => $invoice_number,
             'date' => current_time('Y-m-d'),
             'due_date' => date('Y-m-d', strtotime(current_time('Y-m-d') . ' +30 days')),
             'currency' => $order->get_currency(),
             'language' => substr(get_locale(), 0, 2),  // Get language from WordPress locale (e.g., 'es' from 'es_ES')
             'contact' => $contact,
+            'contact_email_override' => $contact['email'], // Override email to enable sending for IssuedSimplifiedInvoice
             'invoice_lines_attributes' => $invoice_lines,
             'extra_info' => sprintf(
                 __('WooCommerce Order #%s', 'b2brouter-woocommerce'),
-                $order->get_order_number()
+                $is_refund ? $order->get_id() : $order->get_order_number()
             ),
         );
+
+        // Add refund-specific fields
+        if ($is_refund && $parent_invoice_info) {
+            // Add amended invoice reference
+            $invoice_data['amended_number'] = $parent_invoice_info['invoice_number'];
+
+            // Parse invoice date (format: Y-m-d)
+            $invoice_date = $parent_invoice_info['invoice_date'];
+            if (!empty($invoice_date)) {
+                // Convert MySQL datetime to Y-m-d format
+                $date_obj = new \DateTime($invoice_date);
+                $invoice_data['amended_date'] = $date_obj->format('Y-m-d');
+            }
+
+            // Add refund reason if available
+            if (method_exists($order, 'get_reason') && !empty($order->get_reason())) {
+                $invoice_data['amended_reason'] = $order->get_reason();
+            }
+
+            // Add is_credit_note flag for non-rectificative countries
+            // This is an undocumented parameter used by B2Brouter API
+            if (!$is_rectificative) {
+                $invoice_data['is_credit_note'] = true;
+            }
+        }
 
         return $invoice_data;
     }
@@ -323,6 +466,84 @@ class Invoice_Generator {
         }
 
         return 0;
+    }
+
+    /**
+     * Check if order is a refund
+     *
+     * @since 1.0.0
+     * @param \WC_Order|\WC_Order_Refund $order The order object
+     * @return bool True if order is a refund
+     */
+    private function is_refund($order) {
+        return $order->get_type() === 'shop_order_refund';
+    }
+
+    /**
+     * Determine invoice type based on TIN presence
+     *
+     * @since 1.0.0
+     * @param \WC_Order|\WC_Order_Refund $order The order object
+     * @return string Invoice type (IssuedInvoice or IssuedSimplifiedInvoice)
+     */
+    private function get_invoice_type($order) {
+        $tin = Customer_Fields::get_order_tin($order);
+
+        // For refunds, get TIN from parent order if not on refund itself
+        if ($this->is_refund($order) && empty($tin)) {
+            $parent_order = wc_get_order($order->get_parent_id());
+            if ($parent_order) {
+                $tin = Customer_Fields::get_order_tin($parent_order);
+            }
+        }
+
+        // Determine type based on TIN presence
+        return !empty($tin) ? 'IssuedInvoice' : 'IssuedSimplifiedInvoice';
+    }
+
+    /**
+     * Check if country uses rectificative invoices (negative amounts)
+     *
+     * @since 1.0.0
+     * @param string $country_code Two-letter country code
+     * @return bool True if country uses rectificative invoices
+     */
+    private function uses_rectificative_invoices($country_code) {
+        return in_array(strtoupper($country_code), self::RECTIFICATIVE_COUNTRIES, true);
+    }
+
+    /**
+     * Get parent invoice information for refund
+     *
+     * @since 1.0.0
+     * @param \WC_Order_Refund $refund_order The refund order
+     * @return array|null Array with invoice info or null if not found
+     */
+    private function get_parent_invoice_info($refund_order) {
+        $parent_id = $refund_order->get_parent_id();
+        if (!$parent_id) {
+            return null;
+        }
+
+        $parent_order = wc_get_order($parent_id);
+        if (!$parent_order) {
+            return null;
+        }
+
+        $invoice_id = $parent_order->get_meta('_b2brouter_invoice_id');
+        $invoice_number = $parent_order->get_meta('_b2brouter_invoice_number');
+        $invoice_date = $parent_order->get_meta('_b2brouter_invoice_date');
+
+        if (empty($invoice_id)) {
+            return null;
+        }
+
+        return array(
+            'invoice_id' => $invoice_id,
+            'invoice_number' => $invoice_number,
+            'invoice_date' => $invoice_date,
+            'parent_order' => $parent_order,
+        );
     }
 
     /**
@@ -722,6 +943,14 @@ class Invoice_Generator {
             return $attachments;
         }
 
+        // Refresh order data to get latest metadata (in case invoice was just generated)
+        $order_id = $order->get_id();
+        $order = wc_get_order($order_id);
+
+        if (!$order) {
+            return $attachments;
+        }
+
         // Check if order has an invoice
         $invoice_id = $order->get_meta('_b2brouter_invoice_id');
         if (empty($invoice_id)) {
@@ -739,11 +968,57 @@ class Invoice_Generator {
             $attach = true;
         }
 
+        if ($email_id === 'customer_refunded_order' && $this->settings->get_attach_to_refunded_order()) {
+            $attach = true;
+        }
+
         if (!$attach) {
             return $attachments;
         }
 
-        // Try to get existing PDF
+        // For refunded order emails, attach the refund's credit note/rectificative PDF instead of parent invoice
+        if ($email_id === 'customer_refunded_order') {
+            $refunds = $order->get_refunds();
+
+            // Attach PDFs for all refunds that have invoices
+            foreach ($refunds as $refund) {
+                // Refresh refund to get latest metadata (in case invoice was just generated)
+                $refund = wc_get_order($refund->get_id());
+
+                $refund_invoice_id = $refund->get_meta('_b2brouter_invoice_id');
+
+                // If refund has no invoice yet, generate it now (on-demand)
+                if (empty($refund_invoice_id)) {
+                    $result = $this->generate_invoice($refund->get_id());
+                    if ($result['success']) {
+                        // Refresh refund to get the new invoice metadata
+                        $refund = wc_get_order($refund->get_id());
+                        $refund_invoice_id = $refund->get_meta('_b2brouter_invoice_id');
+                    }
+                }
+
+                if (!empty($refund_invoice_id)) {
+                    $refund_pdf_path = $refund->get_meta('_b2brouter_invoice_pdf_path');
+
+                    // If no cached PDF, try to download it
+                    if (empty($refund_pdf_path) || !file_exists($refund_pdf_path)) {
+                        $save_result = $this->save_invoice_pdf($refund->get_id(), false);
+                        if ($save_result['success']) {
+                            $refund_pdf_path = $save_result['file_path'];
+                        }
+                    }
+
+                    // Add refund PDF to attachments
+                    if (!empty($refund_pdf_path) && file_exists($refund_pdf_path)) {
+                        $attachments[] = $refund_pdf_path;
+                    }
+                }
+            }
+
+            return $attachments;
+        }
+
+        // For other emails, attach the order's invoice PDF
         $pdf_path = $order->get_meta('_b2brouter_invoice_pdf_path');
 
         // If no cached PDF, try to download it temporarily

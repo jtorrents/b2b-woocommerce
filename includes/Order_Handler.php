@@ -48,8 +48,11 @@ class Order_Handler {
         $this->settings = $settings;
         $this->invoice_generator = $invoice_generator;
 
-        // Automatic invoice generation on order completed
-        add_action('woocommerce_order_status_completed', array($this, 'maybe_generate_invoice_automatic'));
+        // Automatic invoice generation on order completed (priority 1 to run before emails at priority 10)
+        add_action('woocommerce_order_status_completed', array($this, 'maybe_generate_invoice_automatic'), 1);
+
+        // Automatic credit note generation on refund created (priority 1 to run before emails at priority 10)
+        add_action('woocommerce_order_refunded', array($this, 'maybe_generate_refund_invoice_automatic'), 1, 2);
 
         // Add meta box to order admin
         add_action('add_meta_boxes', array($this, 'add_invoice_meta_box'));
@@ -101,17 +104,61 @@ class Order_Handler {
     }
 
     /**
+     * Maybe generate credit note automatically when refund is created
+     *
+     * @since 1.0.0
+     * @param int $order_id The parent order ID
+     * @param int $refund_id The refund ID
+     * @return void
+     */
+    public function maybe_generate_refund_invoice_automatic($order_id, $refund_id) {
+        // Check if automatic mode is enabled
+        if ($this->settings->get_invoice_mode() !== 'automatic') {
+            return;
+        }
+
+        // Check if API key is configured
+        if (!$this->settings->is_api_key_configured()) {
+            return;
+        }
+
+        // Check if parent order has invoice
+        if (!$this->invoice_generator->has_invoice($order_id)) {
+            return;
+        }
+
+        // Check if refund already has invoice
+        if ($this->invoice_generator->has_invoice($refund_id)) {
+            return;
+        }
+
+        // Generate credit note for refund
+        $this->invoice_generator->generate_invoice($refund_id);
+    }
+
+    /**
      * Add invoice meta box to order admin
      *
      * @since 1.0.0
      * @return void
      */
     public function add_invoice_meta_box() {
+        // Add for regular orders
         add_meta_box(
             'b2brouter_invoice',
             __('B2Brouter Invoice', 'b2brouter-woocommerce'),
             array($this, 'render_invoice_meta_box'),
             'shop_order',
+            'side',
+            'default'
+        );
+
+        // Add for refunds
+        add_meta_box(
+            'b2brouter_invoice',
+            __('B2Brouter Credit Note', 'b2brouter-woocommerce'),
+            array($this, 'render_invoice_meta_box'),
+            'shop_order_refund',
             'side',
             'default'
         );
@@ -134,29 +181,93 @@ class Order_Handler {
      * Render invoice meta box
      *
      * @since 1.0.0
-     * @param \WP_Post|\WC_Order $post_or_order Post or order object
+     * @param \WP_Post|\WC_Order|\WC_Order_Refund $post_or_order Post or order object
      * @return void
      */
     public function render_invoice_meta_box($post_or_order) {
         $order = $post_or_order instanceof \WC_Order ? $post_or_order : wc_get_order($post_or_order->ID);
         $order_id = $order->get_id();
+        $is_refund = $order->get_type() === 'shop_order_refund';
 
         $has_invoice = $this->invoice_generator->has_invoice($order_id);
         $invoice_id = $this->invoice_generator->get_invoice_id($order_id);
 
+        // For refunds, get parent order info
+        $parent_order = null;
+        $parent_has_invoice = false;
+        if ($is_refund) {
+            $parent_id = $order->get_parent_id();
+            $parent_order = $parent_id ? wc_get_order($parent_id) : null;
+            $parent_has_invoice = $parent_order ? $this->invoice_generator->has_invoice($parent_id) : false;
+        }
+
         ?>
         <div class="b2brouter-invoice-meta-box">
+            <?php if ($is_refund && $parent_order): ?>
+                <!-- Parent Order Invoice Info -->
+                <p>
+                    <strong><?php esc_html_e('Parent Order:', 'b2brouter-woocommerce'); ?></strong>
+                    <br>
+                    <a href="<?php echo esc_url(admin_url('post.php?post=' . $parent_order->get_id() . '&action=edit')); ?>">
+                        #<?php echo esc_html($parent_order->get_order_number()); ?>
+                    </a>
+                </p>
+
+                <?php if ($parent_has_invoice): ?>
+                    <p>
+                        <span class="dashicons dashicons-yes-alt" style="color: #46b450;"></span>
+                        <?php esc_html_e('Parent has invoice', 'b2brouter-woocommerce'); ?>
+                    </p>
+                    <p class="description" style="font-size: 11px;">
+                        <strong><?php esc_html_e('Parent Invoice:', 'b2brouter-woocommerce'); ?></strong>
+                        <?php echo esc_html($parent_order->get_meta('_b2brouter_invoice_number')); ?>
+                    </p>
+                <?php else: ?>
+                    <p>
+                        <span class="dashicons dashicons-warning" style="color: #f0b849;"></span>
+                        <?php esc_html_e('Parent has no invoice', 'b2brouter-woocommerce'); ?>
+                    </p>
+                    <p class="description">
+                        <?php esc_html_e('Generate invoice for parent order first.', 'b2brouter-woocommerce'); ?>
+                    </p>
+                <?php endif; ?>
+
+                <hr style="margin: 15px 0;">
+            <?php endif; ?>
+
             <?php if ($has_invoice): ?>
                 <p class="b2brouter-invoice-status">
                     <span class="dashicons dashicons-yes-alt" style="color: #46b450;"></span>
-                    <?php esc_html_e('Invoice Generated', 'b2brouter-woocommerce'); ?>
+                    <?php
+                    if ($is_refund) {
+                        esc_html_e('Credit Note Generated', 'b2brouter-woocommerce');
+                    } else {
+                        esc_html_e('Invoice Generated', 'b2brouter-woocommerce');
+                    }
+                    ?>
                 </p>
                 <p>
-                    <strong><?php esc_html_e('Invoice ID:', 'b2brouter-woocommerce'); ?></strong>
+                    <strong>
+                        <?php
+                        if ($is_refund) {
+                            esc_html_e('Credit Note ID:', 'b2brouter-woocommerce');
+                        } else {
+                            esc_html_e('Invoice ID:', 'b2brouter-woocommerce');
+                        }
+                        ?>
+                    </strong>
                     <br><?php echo esc_html($invoice_id); ?>
                 </p>
                 <p>
-                    <strong><?php esc_html_e('Invoice Number:', 'b2brouter-woocommerce'); ?></strong>
+                    <strong>
+                        <?php
+                        if ($is_refund) {
+                            esc_html_e('Credit Note Number:', 'b2brouter-woocommerce');
+                        } else {
+                            esc_html_e('Invoice Number:', 'b2brouter-woocommerce');
+                        }
+                        ?>
+                    </strong>
                     <br><?php echo esc_html($order->get_meta('_b2brouter_invoice_number')); ?>
                 </p>
                 <p>
@@ -208,7 +319,13 @@ class Order_Handler {
             <?php else: ?>
                 <p class="b2brouter-invoice-status">
                     <span class="dashicons dashicons-warning" style="color: #f0b849;"></span>
-                    <?php esc_html_e('Invoice Not Generated', 'b2brouter-woocommerce'); ?>
+                    <?php
+                    if ($is_refund) {
+                        esc_html_e('Credit Note Not Generated', 'b2brouter-woocommerce');
+                    } else {
+                        esc_html_e('Invoice Not Generated', 'b2brouter-woocommerce');
+                    }
+                    ?>
                 </p>
 
                 <?php if (!$this->settings->is_api_key_configured()): ?>
@@ -218,19 +335,93 @@ class Order_Handler {
                             <?php esc_html_e('Configure now', 'b2brouter-woocommerce'); ?>
                         </a>
                     </p>
+                <?php elseif ($is_refund && !$parent_has_invoice): ?>
+                    <p class="description">
+                        <?php esc_html_e('Cannot generate credit note: parent order has no invoice.', 'b2brouter-woocommerce'); ?>
+                    </p>
                 <?php else: ?>
                     <p>
                         <button type="button"
                                 class="button button-primary b2brouter-generate-invoice"
                                 data-order-id="<?php echo esc_attr($order_id); ?>">
-                            <?php esc_html_e('Generate Invoice', 'b2brouter-woocommerce'); ?>
+                            <?php
+                            if ($is_refund) {
+                                esc_html_e('Generate Credit Note', 'b2brouter-woocommerce');
+                            } else {
+                                esc_html_e('Generate Invoice', 'b2brouter-woocommerce');
+                            }
+                            ?>
                         </button>
                     </p>
                     <p class="description">
-                        <?php esc_html_e('Click to manually generate an invoice for this order.', 'b2brouter-woocommerce'); ?>
+                        <?php
+                        if ($is_refund) {
+                            esc_html_e('Click to manually generate a credit note for this refund.', 'b2brouter-woocommerce');
+                        } else {
+                            esc_html_e('Click to manually generate an invoice for this order.', 'b2brouter-woocommerce');
+                        }
+                        ?>
                     </p>
                 <?php endif; ?>
             <?php endif; ?>
+
+            <?php
+            // Show refund invoices for parent orders
+            if (!$is_refund) {
+                $refunds = $order->get_refunds();
+                if (!empty($refunds)) {
+                    ?>
+                    <hr style="margin: 15px 0;">
+                    <h4 style="margin-top: 0;"><?php esc_html_e('Refund Invoices', 'b2brouter-woocommerce'); ?></h4>
+                    <?php
+                    foreach ($refunds as $refund) {
+                        $refund_has_invoice = $this->invoice_generator->has_invoice($refund->get_id());
+                        $refund_invoice_number = $refund->get_meta('_b2brouter_invoice_number');
+                        ?>
+                        <div style="padding: 8px; background: #f9f9f9; margin-bottom: 8px; border-left: 3px solid <?php echo $refund_has_invoice ? '#46b450' : '#ddd'; ?>;">
+                            <p style="margin: 0 0 5px 0;">
+                                <strong>
+                                    <?php printf(esc_html__('Refund #%s', 'b2brouter-woocommerce'), $refund->get_id()); ?>
+                                </strong>
+                                <span style="color: #666; font-size: 0.9em;">
+                                    (<?php echo wc_price($refund->get_amount(), array('currency' => $order->get_currency())); ?>)
+                                </span>
+                            </p>
+                            <?php if ($refund_has_invoice): ?>
+                                <p style="margin: 0 0 5px 0; font-size: 0.9em;">
+                                    <span class="dashicons dashicons-yes-alt" style="color: #46b450; font-size: 14px;"></span>
+                                    <?php echo esc_html($refund_invoice_number); ?>
+                                </p>
+                                <p style="margin: 0;">
+                                    <button type="button"
+                                            class="button button-small b2brouter-download-pdf"
+                                            data-order-id="<?php echo esc_attr($refund->get_id()); ?>"
+                                            data-download="view"
+                                            style="margin-right: 5px; padding: 0 8px; height: 24px; line-height: 22px; font-size: 11px;">
+                                        <span class="dashicons dashicons-pdf" style="font-size: 13px; width: 13px; height: 13px;"></span>
+                                        <?php esc_html_e('View', 'b2brouter-woocommerce'); ?>
+                                    </button>
+                                    <button type="button"
+                                            class="button button-small b2brouter-download-pdf"
+                                            data-order-id="<?php echo esc_attr($refund->get_id()); ?>"
+                                            data-download="download"
+                                            style="padding: 0 8px; height: 24px; line-height: 22px; font-size: 11px;">
+                                        <span class="dashicons dashicons-download" style="font-size: 13px; width: 13px; height: 13px;"></span>
+                                        <?php esc_html_e('Download', 'b2brouter-woocommerce'); ?>
+                                    </button>
+                                </p>
+                            <?php else: ?>
+                                <p style="margin: 0; font-size: 0.9em; color: #999;">
+                                    <span class="dashicons dashicons-minus" style="font-size: 14px;"></span>
+                                    <?php esc_html_e('No credit note', 'b2brouter-woocommerce'); ?>
+                                </p>
+                            <?php endif; ?>
+                        </div>
+                        <?php
+                    }
+                }
+            }
+            ?>
 
             <p>
                 <a href="https://app.b2brouter.net" target="_blank" class="button button-secondary">

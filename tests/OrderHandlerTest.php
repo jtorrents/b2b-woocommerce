@@ -96,10 +96,10 @@ class OrderHandlerTest extends TestCase {
      * @return void
      */
     public function test_maybe_generate_invoice_automatic_generates_when_enabled() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         $order = new WC_Order(200);
-        $mock_orders[200] = $order;
+        $wc_mock_orders[200] = $order;
 
         $this->mock_settings->method('get_invoice_mode')
                            ->willReturn('automatic');
@@ -113,7 +113,7 @@ class OrderHandlerTest extends TestCase {
 
         $this->handler->maybe_generate_invoice_automatic(200);
 
-        unset($mock_orders[200]);
+        unset($wc_mock_orders[200]);
     }
 
     /**
@@ -188,13 +188,13 @@ class OrderHandlerTest extends TestCase {
      * @return void
      */
     public function test_render_invoice_meta_box_shows_invoice_details() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         $order = new WC_Order(201);
         $order->add_meta_data('_b2brouter_invoice_id', 'inv-123', true);
         $order->add_meta_data('_b2brouter_invoice_number', 'INV-001', true);
         $order->add_meta_data('_b2brouter_invoice_date', '2025-11-13 10:00:00', true);
-        $mock_orders[201] = $order;
+        $wc_mock_orders[201] = $order;
 
         $this->mock_invoice_generator->method('has_invoice')
                                     ->willReturn(true);
@@ -209,7 +209,7 @@ class OrderHandlerTest extends TestCase {
         $this->assertStringContainsString('inv-123', $output);
         $this->assertStringContainsString('INV-001', $output);
 
-        unset($mock_orders[201]);
+        unset($wc_mock_orders[201]);
     }
 
     /**
@@ -218,10 +218,10 @@ class OrderHandlerTest extends TestCase {
      * @return void
      */
     public function test_render_invoice_meta_box_shows_generate_button() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         $order = new WC_Order(202);
-        $mock_orders[202] = $order;
+        $wc_mock_orders[202] = $order;
 
         $this->mock_invoice_generator->method('has_invoice')
                                     ->willReturn(false);
@@ -236,7 +236,7 @@ class OrderHandlerTest extends TestCase {
         $this->assertStringContainsString('Generate Invoice', $output);
         $this->assertStringContainsString('data-order-id="202"', $output);
 
-        unset($mock_orders[202]);
+        unset($wc_mock_orders[202]);
     }
 
     /**
@@ -245,10 +245,10 @@ class OrderHandlerTest extends TestCase {
      * @return void
      */
     public function test_render_invoice_meta_box_shows_api_key_warning() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         $order = new WC_Order(203);
-        $mock_orders[203] = $order;
+        $wc_mock_orders[203] = $order;
 
         $this->mock_invoice_generator->method('has_invoice')
                                     ->willReturn(false);
@@ -262,7 +262,7 @@ class OrderHandlerTest extends TestCase {
         $this->assertStringContainsString('API key not configured', $output);
         $this->assertStringContainsString('Configure now', $output);
 
-        unset($mock_orders[203]);
+        unset($wc_mock_orders[203]);
     }
 
     /**
@@ -295,10 +295,10 @@ class OrderHandlerTest extends TestCase {
      * @return void
      */
     public function test_render_invoice_column_shows_checkmark_when_invoice_exists() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         $order = new WC_Order(204);
-        $mock_orders[204] = $order;
+        $wc_mock_orders[204] = $order;
 
         $this->mock_invoice_generator->method('has_invoice')
                                     ->willReturn(true);
@@ -310,7 +310,7 @@ class OrderHandlerTest extends TestCase {
         $this->assertStringContainsString('dashicons-yes-alt', $output);
         $this->assertStringContainsString('Invoice generated', $output);
 
-        unset($mock_orders[204]);
+        unset($wc_mock_orders[204]);
     }
 
     /**
@@ -319,10 +319,10 @@ class OrderHandlerTest extends TestCase {
      * @return void
      */
     public function test_render_invoice_column_shows_minus_when_no_invoice() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         $order = new WC_Order(205);
-        $mock_orders[205] = $order;
+        $wc_mock_orders[205] = $order;
 
         $this->mock_invoice_generator->method('has_invoice')
                                     ->willReturn(false);
@@ -334,7 +334,7 @@ class OrderHandlerTest extends TestCase {
         $this->assertStringContainsString('dashicons-minus', $output);
         $this->assertStringContainsString('No invoice', $output);
 
-        unset($mock_orders[205]);
+        unset($wc_mock_orders[205]);
     }
 
     /**
@@ -499,10 +499,10 @@ class OrderHandlerTest extends TestCase {
      * @return void
      */
     public function test_attach_pdf_to_email_delegates_to_generator() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         $order = new WC_Order(400);
-        $mock_orders[400] = $order;
+        $wc_mock_orders[400] = $order;
 
         $attachments = array('/path/to/existing.pdf');
         $expected_result = array('/path/to/existing.pdf', '/path/to/invoice.pdf');
@@ -517,7 +517,7 @@ class OrderHandlerTest extends TestCase {
 
         $this->assertEquals($expected_result, $result);
 
-        unset($mock_orders[400]);
+        unset($wc_mock_orders[400]);
     }
 
     /**
@@ -526,10 +526,10 @@ class OrderHandlerTest extends TestCase {
      * @return void
      */
     public function test_attach_pdf_to_email_passes_parameters() {
-        global $mock_orders;
+        global $wc_mock_orders;
 
         $order = new WC_Order(401);
-        $mock_orders[401] = $order;
+        $wc_mock_orders[401] = $order;
 
         $attachments = array();
         $email_id = 'customer_invoice';
@@ -544,7 +544,7 @@ class OrderHandlerTest extends TestCase {
 
         $this->handler->attach_pdf_to_email($attachments, $email_id, $order);
 
-        unset($mock_orders[401]);
+        unset($wc_mock_orders[401]);
     }
 
     /**
