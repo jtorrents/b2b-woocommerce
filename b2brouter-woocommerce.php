@@ -87,6 +87,9 @@ class B2Brouter_WooCommerce {
      */
     private function __construct() {
         $this->init();
+
+        // Register TIN field for block checkout EARLY (before woocommerce_blocks_loaded fires)
+        add_action('woocommerce_blocks_loaded', array($this, 'register_block_checkout_fields'), 10);
     }
 
     /**
@@ -139,6 +142,39 @@ class B2Brouter_WooCommerce {
         $this->get('admin');
         $this->get('order_handler');
         $this->get('customer');
+        $this->get('customer_fields');
+    }
+
+    /**
+     * Register additional checkout fields for WooCommerce Blocks
+     *
+     * @since 1.0.0
+     * @return void
+     */
+    public function register_block_checkout_fields() {
+        if (!function_exists('woocommerce_register_additional_checkout_field')) {
+            return;
+        }
+
+        try {
+            // Note: Using plain English strings here instead of __() to avoid translation loading
+            // before 'init' action. WooCommerce Blocks will handle translation on the frontend.
+            woocommerce_register_additional_checkout_field(
+                array(
+                    'id' => 'b2brouter/tin',
+                    'label' => 'Tax ID / VAT Number',
+                    'optionalLabel' => 'Tax ID / VAT Number (optional)',
+                    'location' => 'contact',
+                    'type' => 'text',
+                    'required' => false,
+                    'sanitize_callback' => 'sanitize_text_field',
+                    // Hide from WooCommerce Blocks admin display (we show it via woocommerce_admin_billing_fields instead)
+                    'show_in_order_confirmation' => false,
+                )
+            );
+        } catch (\Exception $e) {
+            // Silent fail - field registration errors are non-critical
+        }
     }
 
     /**
@@ -182,6 +218,11 @@ class B2Brouter_WooCommerce {
                 $this->get('settings'),
                 $this->get('invoice_generator')
             );
+        };
+
+        // Register Customer_Fields (no dependencies)
+        $this->container['customer_fields'] = function() {
+            return new \B2Brouter\WooCommerce\Customer_Fields();
         };
     }
 

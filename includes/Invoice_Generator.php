@@ -205,10 +205,13 @@ class Invoice_Generator {
             $contact['address'] .= ', ' . $order->get_billing_address_2();
         }
 
-        // Add VAT/TIN number if available
-        $vat_number = $order->get_meta('_billing_vat_number');
-        if (!empty($vat_number)) {
-            $contact['tin_value'] = $vat_number;
+        // Add TIN/VAT number if available
+        $tin = Customer_Fields::get_order_tin($order);
+        if (!empty($tin)) {
+            $contact['tin_value'] = $tin;
+            // B2BRouter uses TIN scheme 9999 for generic tax IDs
+            // This can be adjusted based on country if needed
+            $contact['tin_scheme'] = 9999;
         }
 
         // Prepare line items

@@ -689,6 +689,22 @@ if (!class_exists('WC_Order')) {
             $this->meta_data[$key] = $value;
         }
 
+        public function update_meta_data($key, $value, $meta_id = '') {
+            $this->meta_data[$key] = $value;
+        }
+
+        public function delete_meta_data($key) {
+            unset($this->meta_data[$key]);
+        }
+
+        public function get_meta_data() {
+            $meta_objects = array();
+            foreach ($this->meta_data as $key => $value) {
+                $meta_objects[] = (object) array('key' => $key, 'value' => $value);
+            }
+            return $meta_objects;
+        }
+
         public function add_order_note($note) {
             $this->notes[] = $note;
         }
@@ -895,3 +911,111 @@ if (!class_exists('B2BRouter\B2BRouterClient')) {
     }
     ');
 }
+
+// Mock WP_Error class
+if (!class_exists('WP_Error')) {
+    /**
+     * Mock WP_Error class
+     */
+    class WP_Error {
+        private $errors = array();
+
+        public function add($code, $message, $data = '') {
+            $this->errors[$code] = array(
+                'message' => $message,
+                'data' => $data
+            );
+        }
+
+        public function get_error_messages($code = '') {
+            if (empty($code)) {
+                $messages = array();
+                foreach ($this->errors as $error) {
+                    $messages[] = $error['message'];
+                }
+                return $messages;
+            }
+            return isset($this->errors[$code]) ? array($this->errors[$code]['message']) : array();
+        }
+
+        public function has_errors() {
+            return !empty($this->errors);
+        }
+    }
+}
+
+// Mock WC_Customer class
+if (!class_exists('WC_Customer')) {
+    /**
+     * Mock WC_Customer class
+     */
+    class WC_Customer {
+        private $id;
+        private $data = array();
+
+        public function __construct($customer_id = 0) {
+            $this->id = $customer_id;
+        }
+
+        public function get_id() {
+            return $this->id;
+        }
+
+        public function set_id($id) {
+            $this->id = $id;
+        }
+    }
+}
+
+// Global user meta storage
+global $wp_user_meta;
+$wp_user_meta = array();
+
+if (!function_exists('get_user_meta')) {
+    /**
+     * Mock get_user_meta function
+     *
+     * @param int $user_id User ID
+     * @param string $key Meta key
+     * @param bool $single Return single value
+     * @return mixed Meta value
+     */
+    function get_user_meta($user_id, $key = '', $single = false) {
+        global $wp_user_meta;
+
+        if (empty($key)) {
+            return isset($wp_user_meta[$user_id]) ? $wp_user_meta[$user_id] : array();
+        }
+
+        if (!isset($wp_user_meta[$user_id][$key])) {
+            return $single ? '' : array();
+        }
+
+        return $single ? $wp_user_meta[$user_id][$key] : array($wp_user_meta[$user_id][$key]);
+    }
+}
+
+if (!function_exists('update_user_meta')) {
+    /**
+     * Mock update_user_meta function
+     *
+     * @param int $user_id User ID
+     * @param string $key Meta key
+     * @param mixed $value Meta value
+     * @return bool Success
+     */
+    function update_user_meta($user_id, $key, $value) {
+        global $wp_user_meta;
+
+        if (!isset($wp_user_meta[$user_id])) {
+            $wp_user_meta[$user_id] = array();
+        }
+
+        $wp_user_meta[$user_id][$key] = $value;
+        return true;
+    }
+}
+
+// Global $wp_filter for hook testing
+global $wp_filter;
+$wp_filter = array();

@@ -9,6 +9,7 @@ B2Brouter for WooCommerce is a WordPress plugin that integrates your WooCommerce
 ### Features
 
 - **Automatic or Manual Invoice Generation**: Choose to generate invoices automatically when orders are completed, or manually from the order admin panel
+- **TIN/VAT Number Field**: Automatic TIN/VAT number collection at checkout for both classic and block-based checkout
 - **API Key Authentication**: Secure integration with B2Brouter using API keys
 - **Transaction Counter**: Track the total number of invoices generated
 - **Admin Bar Counter**: Quick view of invoice count directly in the WordPress admin bar
@@ -127,6 +128,32 @@ To access advanced settings:
 1. Click **Access B2Brouter Account Settings** in the plugin settings page
 2. Or visit [B2Brouter Account](https://app.b2brouter.net) directly
 
+## TIN/VAT Number Collection
+
+The plugin automatically adds a TIN/VAT Number field to your WooCommerce checkout to collect tax identification numbers from customers.
+
+### Supported Checkout Types
+
+- **Block Checkout** (WooCommerce 8.6+): Field appears in the contact information section
+- **Classic Checkout** (Shortcode-based): Field appears in the billing section after company name
+
+### Field Details
+
+- **Label**: "Tax ID / VAT Number"
+- **Type**: Text field (optional)
+- **Location**: Contact section (block checkout) or Billing section (classic checkout)
+- **Storage**: Saved as `_billing_tin` order meta
+- **Admin**: Visible in order edit screen under billing information
+
+### How It Works
+
+1. Customer enters their TIN/VAT number during checkout
+2. Value is saved to the order as `_billing_tin` meta
+3. TIN is displayed in the admin order view
+4. TIN is automatically included in B2Brouter invoices
+
+**Note**: The field is optional by default. Customers can complete checkout without entering a TIN/VAT number.
+
 ## Invoice Data
 
 The plugin automatically includes the following data in invoices:
@@ -134,7 +161,7 @@ The plugin automatically includes the following data in invoices:
 - Customer name and email
 - Billing address (street, city, postal code, country)
 - Company name (if provided)
-- VAT number (if available in order meta as `_billing_vat_number`)
+- **Tax ID / VAT Number** (collected at checkout via the TIN field)
 - Order line items with quantities, prices, and tax rates
 - Shipping costs (if applicable)
 - Order currency
