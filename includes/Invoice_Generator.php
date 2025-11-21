@@ -140,6 +140,8 @@ class Invoice_Generator {
             // Store invoice ID in order meta
             $order->add_meta_data('_b2brouter_invoice_id', $invoice['id'], true);
             $order->add_meta_data('_b2brouter_invoice_number', $invoice['number'] ?? '', true);
+            // Store the series_code we sent to the API (from invoice_data, not from response)
+            $order->add_meta_data('_b2brouter_invoice_series_code', $invoice_data['series_code'] ?? '', true);
             $order->add_meta_data('_b2brouter_invoice_date', current_time('mysql'), true);
             $order->save();
 
@@ -149,13 +151,21 @@ class Invoice_Generator {
                 ? $parent_invoice_info['parent_order']
                 : $order;
 
+            // Format invoice number with series code (use series_code from request data)
+            $formatted_number = self::format_invoice_number(
+                $invoice['number'] ?? '',
+                $invoice_data['series_code'] ?? ''
+            );
+
             $note_message = $is_refund
                 ? sprintf(
-                    __('B2Brouter credit note generated successfully. Invoice ID: %s', 'b2brouter-woocommerce'),
+                    __('B2Brouter credit note generated successfully. Invoice: %s (ID: %s)', 'b2brouter-woocommerce'),
+                    $formatted_number,
                     $invoice['id']
                   )
                 : sprintf(
-                    __('B2Brouter invoice generated successfully. Invoice ID: %s', 'b2brouter-woocommerce'),
+                    __('B2Brouter invoice generated successfully. Invoice: %s (ID: %s)', 'b2brouter-woocommerce'),
+                    $formatted_number,
                     $invoice['id']
                   );
 
@@ -373,17 +383,16 @@ class Invoice_Generator {
             $invoice_lines[] = $shipping_line;
         }
 
-        // Generate invoice number based on order
-        $invoice_prefix = $is_refund ? 'REF-' : 'INV-';
-        $invoice_number = $invoice_prefix . $billing_order->get_billing_country() . '-' . date('Y') . '-' . str_pad($order->get_id(), 5, '0', STR_PAD_LEFT);
-
         // Determine invoice type (IssuedInvoice or IssuedSimplifiedInvoice)
         $invoice_type = $this->get_invoice_type($order);
+
+        // Get series code and invoice number based on settings
+        $series_code = $this->get_series_code_for_invoice($is_refund);
+        $invoice_number = $this->generate_invoice_number($order, $series_code, $is_refund);
 
         // Prepare base invoice data
         $invoice_data = array(
             'type' => $invoice_type,
-            'number' => $invoice_number,
             'date' => current_time('Y-m-d'),
             'due_date' => date('Y-m-d', strtotime(current_time('Y-m-d') . ' +30 days')),
             'currency' => $order->get_currency(),
@@ -396,6 +405,16 @@ class Invoice_Generator {
                 $is_refund ? $order->get_id() : $order->get_order_number()
             ),
         );
+
+        // Add series code if configured
+        if (!empty($series_code)) {
+            $invoice_data['series_code'] = $series_code;
+        }
+
+        // Add invoice number if not using automatic numbering
+        if ($invoice_number !== null) {
+            $invoice_data['number'] = $invoice_number;
+        }
 
         // Add refund-specific fields
         if ($is_refund && $parent_invoice_info) {
@@ -1112,5 +1131,110 @@ class Invoice_Generator {
                 $order->save();
             }
         }
+    }
+
+    /**
+     * Format invoice number with series code prefix
+     *
+     * @since 1.0.0
+     * @param string $invoice_number The invoice number
+     * @param string $series_code The series code
+     * @return string The formatted invoice number
+     */
+    public static function format_invoice_number($invoice_number, $series_code = '') {
+        if (empty($series_code) || empty($invoice_number)) {
+            return $invoice_number;
+        }
+        return $series_code . '-' . $invoice_number;
+    }
+
+    /**
+     * Get formatted invoice number from order meta
+     *
+     * @since 1.0.0
+     * @param \WC_Order|\WC_Order_Refund $order The order or refund object
+     * @return string The formatted invoice number
+     */
+    public static function get_formatted_invoice_number($order) {
+        $invoice_number = $order->get_meta('_b2brouter_invoice_number');
+        $series_code = $order->get_meta('_b2brouter_invoice_series_code');
+        return self::format_invoice_number($invoice_number, $series_code);
+    }
+
+    /**
+     * Get series code for invoice based on type
+     *
+     * @since 1.0.0
+     * @param bool $is_credit_note Whether this is a credit note
+     * @return string The series code to use
+     */
+    private function get_series_code_for_invoice($is_credit_note) {
+        if ($is_credit_note) {
+            $series_code = $this->settings->get_credit_note_series_code();
+            // Fall back to invoice series code if credit note series is not set
+            if (empty($series_code)) {
+                $series_code = $this->settings->get_invoice_series_code();
+            }
+        } else {
+            $series_code = $this->settings->get_invoice_series_code();
+        }
+
+        return $series_code;
+    }
+
+    /**
+     * Generate invoice number based on configured pattern
+     *
+     * @since 1.0.0
+     * @param \WC_Order|\WC_Order_Refund $order The order or refund object
+     * @param string $series_code The series code being used
+     * @param bool $is_credit_note Whether this is a credit note
+     * @return string|null The invoice number, or null for automatic numbering
+     */
+    private function generate_invoice_number($order, $series_code, $is_credit_note) {
+        $pattern = $this->settings->get_invoice_numbering_pattern();
+
+        switch ($pattern) {
+            case 'automatic':
+                // Don't send number field, let B2Brouter assign it
+                return null;
+
+            case 'woocommerce':
+                // Use WooCommerce order number
+                return $order->get_order_number();
+
+            case 'sequential':
+                // Get next sequential number for this series
+                return (string) $this->settings->get_next_sequential_number($series_code);
+
+            case 'custom':
+                // Apply custom pattern
+                $custom_pattern = $this->settings->get_custom_numbering_pattern();
+                return $this->apply_custom_pattern($custom_pattern, $order);
+
+            default:
+                // Default to WooCommerce order number
+                return $order->get_order_number();
+        }
+    }
+
+    /**
+     * Apply custom pattern to generate invoice number
+     *
+     * @since 1.0.0
+     * @param string $pattern The pattern with placeholders
+     * @param \WC_Order|\WC_Order_Refund $order The order or refund object
+     * @return string The generated invoice number
+     */
+    private function apply_custom_pattern($pattern, $order) {
+        $replacements = array(
+            '{order_id}' => $order->get_id(),
+            '{order_number}' => $order->get_order_number(),
+            '{year}' => date('Y'),
+            '{month}' => date('m'),
+            '{day}' => date('d'),
+        );
+
+        return str_replace(array_keys($replacements), array_values($replacements), $pattern);
     }
 }

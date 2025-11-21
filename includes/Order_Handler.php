@@ -220,7 +220,7 @@ class Order_Handler {
                     </p>
                     <p class="description" style="font-size: 11px;">
                         <strong><?php esc_html_e('Parent Invoice:', 'b2brouter-woocommerce'); ?></strong>
-                        <?php echo esc_html($parent_order->get_meta('_b2brouter_invoice_number')); ?>
+                        <?php echo esc_html(Invoice_Generator::get_formatted_invoice_number($parent_order)); ?>
                     </p>
                 <?php else: ?>
                     <p>
@@ -268,7 +268,7 @@ class Order_Handler {
                         }
                         ?>
                     </strong>
-                    <br><?php echo esc_html($order->get_meta('_b2brouter_invoice_number')); ?>
+                    <br><?php echo esc_html(Invoice_Generator::get_formatted_invoice_number($order)); ?>
                 </p>
                 <p>
                     <strong><?php esc_html_e('Generated Date:', 'b2brouter-woocommerce'); ?></strong>
@@ -376,7 +376,7 @@ class Order_Handler {
                     <?php
                     foreach ($refunds as $refund) {
                         $refund_has_invoice = $this->invoice_generator->has_invoice($refund->get_id());
-                        $refund_invoice_number = $refund->get_meta('_b2brouter_invoice_number');
+                        $refund_invoice_number = Invoice_Generator::get_formatted_invoice_number($refund);
                         ?>
                         <div style="padding: 8px; background: #f9f9f9; margin-bottom: 8px; border-left: 3px solid <?php echo $refund_has_invoice ? '#46b450' : '#ddd'; ?>;">
                             <p style="margin: 0 0 5px 0;">

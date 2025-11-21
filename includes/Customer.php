@@ -159,7 +159,7 @@ class Customer {
 
         // Check if order has an invoice
         $invoice_id = $order->get_meta('_b2brouter_invoice_id');
-        $invoice_number = $order->get_meta('_b2brouter_invoice_number');
+        $invoice_number = Invoice_Generator::get_formatted_invoice_number($order);
 
         if (empty($invoice_id)) {
             return;

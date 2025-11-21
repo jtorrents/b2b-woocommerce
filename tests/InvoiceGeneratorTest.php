@@ -1010,4 +1010,94 @@ class InvoiceGeneratorTest extends TestCase {
 
         $this->assertIsBool($result);
     }
+
+    // ========== Invoice Number Formatting Tests ==========
+
+    /**
+     * Test format_invoice_number with series code
+     *
+     * @return void
+     */
+    public function test_format_invoice_number_with_series_code() {
+        $formatted = Invoice_Generator::format_invoice_number('12345', 'INV');
+        $this->assertEquals('INV-12345', $formatted);
+    }
+
+    /**
+     * Test format_invoice_number without series code returns number only
+     *
+     * @return void
+     */
+    public function test_format_invoice_number_without_series_code() {
+        $formatted = Invoice_Generator::format_invoice_number('12345', '');
+        $this->assertEquals('12345', $formatted);
+    }
+
+    /**
+     * Test format_invoice_number with empty invoice number
+     *
+     * @return void
+     */
+    public function test_format_invoice_number_with_empty_number() {
+        $formatted = Invoice_Generator::format_invoice_number('', 'INV');
+        $this->assertEquals('', $formatted);
+    }
+
+    /**
+     * Test format_invoice_number with both empty
+     *
+     * @return void
+     */
+    public function test_format_invoice_number_with_both_empty() {
+        $formatted = Invoice_Generator::format_invoice_number('', '');
+        $this->assertEquals('', $formatted);
+    }
+
+    /**
+     * Test get_formatted_invoice_number from order
+     *
+     * @return void
+     */
+    public function test_get_formatted_invoice_number_from_order() {
+        global $wc_mock_orders;
+
+        $order = new WC_Order(405);
+        $order->add_meta_data('_b2brouter_invoice_number', '12345', true);
+        $order->add_meta_data('_b2brouter_invoice_series_code', 'INV', true);
+        $wc_mock_orders[405] = $order;
+
+        $formatted = Invoice_Generator::get_formatted_invoice_number($order);
+        $this->assertEquals('INV-12345', $formatted);
+
+        unset($wc_mock_orders[405]);
+    }
+
+    /**
+     * Test get_formatted_invoice_number without series code
+     *
+     * @return void
+     */
+    public function test_get_formatted_invoice_number_without_series_code() {
+        global $wc_mock_orders;
+
+        $order = new WC_Order(406);
+        $order->add_meta_data('_b2brouter_invoice_number', '12345', true);
+        $wc_mock_orders[406] = $order;
+
+        $formatted = Invoice_Generator::get_formatted_invoice_number($order);
+        $this->assertEquals('12345', $formatted);
+
+        unset($wc_mock_orders[406]);
+    }
+
+    /**
+     * Test format_invoice_number with various series codes
+     *
+     * @return void
+     */
+    public function test_format_invoice_number_with_various_series() {
+        $this->assertEquals('CN-98765', Invoice_Generator::format_invoice_number('98765', 'CN'));
+        $this->assertEquals('S01-111', Invoice_Generator::format_invoice_number('111', 'S01'));
+        $this->assertEquals('R01-222', Invoice_Generator::format_invoice_number('222', 'R01'));
+    }
 }

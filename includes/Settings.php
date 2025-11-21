@@ -35,6 +35,9 @@ class Settings {
     const OPTION_ATTACH_TO_REFUNDED_ORDER = 'b2brouter_attach_to_refunded_order';
     const OPTION_AUTO_CLEANUP_ENABLED = 'b2brouter_auto_cleanup_enabled';
     const OPTION_AUTO_CLEANUP_DAYS = 'b2brouter_auto_cleanup_days';
+    const OPTION_INVOICE_SERIES_CODE = 'b2brouter_invoice_series_code';
+    const OPTION_CREDIT_NOTE_SERIES_CODE = 'b2brouter_credit_note_series_code';
+    const OPTION_INVOICE_NUMBERING_PATTERN = 'b2brouter_invoice_numbering_pattern';
 
     /**
      * Constructor
@@ -434,5 +437,108 @@ class Settings {
      */
     public function set_auto_cleanup_days($days) {
         return update_option(self::OPTION_AUTO_CLEANUP_DAYS, max(1, intval($days)));
+    }
+
+    /**
+     * Get invoice series code
+     *
+     * @since 1.0.0
+     * @return string
+     */
+    public function get_invoice_series_code() {
+        return get_option(self::OPTION_INVOICE_SERIES_CODE, '');
+    }
+
+    /**
+     * Set invoice series code
+     *
+     * @since 1.0.0
+     * @param string $code
+     * @return bool
+     */
+    public function set_invoice_series_code($code) {
+        return update_option(self::OPTION_INVOICE_SERIES_CODE, sanitize_text_field($code));
+    }
+
+    /**
+     * Get credit note series code
+     *
+     * @since 1.0.0
+     * @return string
+     */
+    public function get_credit_note_series_code() {
+        return get_option(self::OPTION_CREDIT_NOTE_SERIES_CODE, '');
+    }
+
+    /**
+     * Set credit note series code
+     *
+     * @since 1.0.0
+     * @param string $code
+     * @return bool
+     */
+    public function set_credit_note_series_code($code) {
+        return update_option(self::OPTION_CREDIT_NOTE_SERIES_CODE, sanitize_text_field($code));
+    }
+
+    /**
+     * Get invoice numbering pattern
+     *
+     * @since 1.0.0
+     * @return string
+     */
+    public function get_invoice_numbering_pattern() {
+        return get_option(self::OPTION_INVOICE_NUMBERING_PATTERN, 'woocommerce');
+    }
+
+    /**
+     * Set invoice numbering pattern
+     *
+     * @since 1.0.0
+     * @param string $pattern
+     * @return bool
+     */
+    public function set_invoice_numbering_pattern($pattern) {
+        $valid_patterns = array('automatic', 'woocommerce', 'sequential', 'custom');
+        if (in_array($pattern, $valid_patterns)) {
+            return update_option(self::OPTION_INVOICE_NUMBERING_PATTERN, $pattern);
+        }
+        return false;
+    }
+
+    /**
+     * Get custom numbering pattern
+     *
+     * @since 1.0.0
+     * @return string
+     */
+    public function get_custom_numbering_pattern() {
+        return get_option('b2brouter_custom_numbering_pattern', 'INV-{order_id}');
+    }
+
+    /**
+     * Set custom numbering pattern
+     *
+     * @since 1.0.0
+     * @param string $pattern
+     * @return bool
+     */
+    public function set_custom_numbering_pattern($pattern) {
+        return update_option('b2brouter_custom_numbering_pattern', sanitize_text_field($pattern));
+    }
+
+    /**
+     * Get next sequential number for a series
+     *
+     * @since 1.0.0
+     * @param string $series_code
+     * @return int
+     */
+    public function get_next_sequential_number($series_code) {
+        $option_name = 'b2brouter_seq_counter_' . sanitize_text_field($series_code);
+        $current = intval(get_option($option_name, 0));
+        $next = $current + 1;
+        update_option($option_name, $next);
+        return $next;
     }
 }

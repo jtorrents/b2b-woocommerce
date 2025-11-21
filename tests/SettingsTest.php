@@ -841,6 +841,16 @@ class SettingsTest extends TestCase {
             'set_auto_cleanup_enabled',
             'get_auto_cleanup_days',
             'set_auto_cleanup_days',
+            // Series codes and numbering
+            'get_invoice_series_code',
+            'set_invoice_series_code',
+            'get_credit_note_series_code',
+            'set_credit_note_series_code',
+            'get_invoice_numbering_pattern',
+            'set_invoice_numbering_pattern',
+            'get_custom_numbering_pattern',
+            'set_custom_numbering_pattern',
+            'get_next_sequential_number',
         ];
 
         foreach ($methods as $method) {
@@ -849,5 +859,289 @@ class SettingsTest extends TestCase {
                 "Method {$method} should exist in Settings class"
             );
         }
+    }
+
+    // ========== Invoice Series Code Tests ==========
+
+    /**
+     * Test get_invoice_series_code returns empty string by default
+     *
+     * @return void
+     */
+    public function test_get_invoice_series_code_returns_empty_by_default() {
+        $series_code = $this->settings->get_invoice_series_code();
+        $this->assertEquals('', $series_code);
+    }
+
+    /**
+     * Test set_invoice_series_code stores value
+     *
+     * @return void
+     */
+    public function test_set_invoice_series_code_stores_value() {
+        $result = $this->settings->set_invoice_series_code('INV');
+        $this->assertTrue($result);
+        $this->assertEquals('INV', $this->settings->get_invoice_series_code());
+    }
+
+    /**
+     * Test set_invoice_series_code sanitizes input
+     *
+     * @return void
+     */
+    public function test_set_invoice_series_code_sanitizes_input() {
+        $this->settings->set_invoice_series_code('  S01  ');
+        $this->assertEquals('S01', $this->settings->get_invoice_series_code());
+    }
+
+    /**
+     * Test set_invoice_series_code accepts empty string
+     *
+     * @return void
+     */
+    public function test_set_invoice_series_code_accepts_empty() {
+        $this->settings->set_invoice_series_code('INV');
+        $this->settings->set_invoice_series_code('');
+        $this->assertEquals('', $this->settings->get_invoice_series_code());
+    }
+
+    // ========== Credit Note Series Code Tests ==========
+
+    /**
+     * Test get_credit_note_series_code returns empty string by default
+     *
+     * @return void
+     */
+    public function test_get_credit_note_series_code_returns_empty_by_default() {
+        $series_code = $this->settings->get_credit_note_series_code();
+        $this->assertEquals('', $series_code);
+    }
+
+    /**
+     * Test set_credit_note_series_code stores value
+     *
+     * @return void
+     */
+    public function test_set_credit_note_series_code_stores_value() {
+        $result = $this->settings->set_credit_note_series_code('CN');
+        $this->assertTrue($result);
+        $this->assertEquals('CN', $this->settings->get_credit_note_series_code());
+    }
+
+    /**
+     * Test set_credit_note_series_code sanitizes input
+     *
+     * @return void
+     */
+    public function test_set_credit_note_series_code_sanitizes_input() {
+        $this->settings->set_credit_note_series_code('  R01  ');
+        $this->assertEquals('R01', $this->settings->get_credit_note_series_code());
+    }
+
+    /**
+     * Test series codes are independent
+     *
+     * @return void
+     */
+    public function test_series_codes_are_independent() {
+        $this->settings->set_invoice_series_code('INV');
+        $this->settings->set_credit_note_series_code('CN');
+
+        $this->assertEquals('INV', $this->settings->get_invoice_series_code());
+        $this->assertEquals('CN', $this->settings->get_credit_note_series_code());
+    }
+
+    // ========== Invoice Numbering Pattern Tests ==========
+
+    /**
+     * Test get_invoice_numbering_pattern returns 'woocommerce' by default
+     *
+     * @return void
+     */
+    public function test_get_invoice_numbering_pattern_returns_woocommerce_by_default() {
+        $pattern = $this->settings->get_invoice_numbering_pattern();
+        $this->assertEquals('woocommerce', $pattern);
+    }
+
+    /**
+     * Test set_invoice_numbering_pattern accepts 'automatic'
+     *
+     * @return void
+     */
+    public function test_set_invoice_numbering_pattern_accepts_automatic() {
+        $result = $this->settings->set_invoice_numbering_pattern('automatic');
+        $this->assertTrue($result);
+        $this->assertEquals('automatic', $this->settings->get_invoice_numbering_pattern());
+    }
+
+    /**
+     * Test set_invoice_numbering_pattern accepts 'woocommerce'
+     *
+     * @return void
+     */
+    public function test_set_invoice_numbering_pattern_accepts_woocommerce() {
+        $result = $this->settings->set_invoice_numbering_pattern('woocommerce');
+        $this->assertTrue($result);
+        $this->assertEquals('woocommerce', $this->settings->get_invoice_numbering_pattern());
+    }
+
+    /**
+     * Test set_invoice_numbering_pattern accepts 'sequential'
+     *
+     * @return void
+     */
+    public function test_set_invoice_numbering_pattern_accepts_sequential() {
+        $result = $this->settings->set_invoice_numbering_pattern('sequential');
+        $this->assertTrue($result);
+        $this->assertEquals('sequential', $this->settings->get_invoice_numbering_pattern());
+    }
+
+    /**
+     * Test set_invoice_numbering_pattern accepts 'custom'
+     *
+     * @return void
+     */
+    public function test_set_invoice_numbering_pattern_accepts_custom() {
+        $result = $this->settings->set_invoice_numbering_pattern('custom');
+        $this->assertTrue($result);
+        $this->assertEquals('custom', $this->settings->get_invoice_numbering_pattern());
+    }
+
+    /**
+     * Test set_invoice_numbering_pattern rejects invalid values
+     *
+     * @return void
+     */
+    public function test_set_invoice_numbering_pattern_rejects_invalid_values() {
+        $result = $this->settings->set_invoice_numbering_pattern('invalid');
+        $this->assertFalse($result);
+
+        $result = $this->settings->set_invoice_numbering_pattern('');
+        $this->assertFalse($result);
+
+        $result = $this->settings->set_invoice_numbering_pattern('AUTOMATIC');
+        $this->assertFalse($result);
+    }
+
+    // ========== Custom Numbering Pattern Tests ==========
+
+    /**
+     * Test get_custom_numbering_pattern returns default value
+     *
+     * @return void
+     */
+    public function test_get_custom_numbering_pattern_returns_default() {
+        $pattern = $this->settings->get_custom_numbering_pattern();
+        $this->assertEquals('INV-{order_id}', $pattern);
+    }
+
+    /**
+     * Test set_custom_numbering_pattern stores value
+     *
+     * @return void
+     */
+    public function test_set_custom_numbering_pattern_stores_value() {
+        $result = $this->settings->set_custom_numbering_pattern('INV-{year}-{order_id}');
+        $this->assertTrue($result);
+        $this->assertEquals('INV-{year}-{order_id}', $this->settings->get_custom_numbering_pattern());
+    }
+
+    /**
+     * Test set_custom_numbering_pattern sanitizes input
+     *
+     * @return void
+     */
+    public function test_set_custom_numbering_pattern_sanitizes_input() {
+        $this->settings->set_custom_numbering_pattern('  {order_id}  ');
+        $this->assertEquals('{order_id}', $this->settings->get_custom_numbering_pattern());
+    }
+
+    // ========== Sequential Numbering Tests ==========
+
+    /**
+     * Test get_next_sequential_number starts at 1
+     *
+     * @return void
+     */
+    public function test_get_next_sequential_number_starts_at_1() {
+        $number = $this->settings->get_next_sequential_number('INV');
+        $this->assertEquals(1, $number);
+    }
+
+    /**
+     * Test get_next_sequential_number increments
+     *
+     * @return void
+     */
+    public function test_get_next_sequential_number_increments() {
+        $first = $this->settings->get_next_sequential_number('INV');
+        $this->assertEquals(1, $first);
+
+        $second = $this->settings->get_next_sequential_number('INV');
+        $this->assertEquals(2, $second);
+
+        $third = $this->settings->get_next_sequential_number('INV');
+        $this->assertEquals(3, $third);
+    }
+
+    /**
+     * Test get_next_sequential_number is series-specific
+     *
+     * @return void
+     */
+    public function test_get_next_sequential_number_is_series_specific() {
+        $inv1 = $this->settings->get_next_sequential_number('INV');
+        $this->assertEquals(1, $inv1);
+
+        $cn1 = $this->settings->get_next_sequential_number('CN');
+        $this->assertEquals(1, $cn1);
+
+        $inv2 = $this->settings->get_next_sequential_number('INV');
+        $this->assertEquals(2, $inv2);
+
+        $cn2 = $this->settings->get_next_sequential_number('CN');
+        $this->assertEquals(2, $cn2);
+    }
+
+    /**
+     * Test get_next_sequential_number returns integer
+     *
+     * @return void
+     */
+    public function test_get_next_sequential_number_returns_integer() {
+        $number = $this->settings->get_next_sequential_number('INV');
+        $this->assertIsInt($number);
+    }
+
+    // ========== Integration Tests: Series Codes & Numbering ==========
+
+    /**
+     * Test complete series code and numbering workflow
+     *
+     * @return void
+     */
+    public function test_series_code_and_numbering_workflow() {
+        // Step 1: Configure series codes
+        $this->settings->set_invoice_series_code('INV');
+        $this->settings->set_credit_note_series_code('CN');
+
+        $this->assertEquals('INV', $this->settings->get_invoice_series_code());
+        $this->assertEquals('CN', $this->settings->get_credit_note_series_code());
+
+        // Step 2: Configure numbering pattern
+        $this->settings->set_invoice_numbering_pattern('sequential');
+        $this->assertEquals('sequential', $this->settings->get_invoice_numbering_pattern());
+
+        // Step 3: Generate sequential numbers
+        $this->assertEquals(1, $this->settings->get_next_sequential_number('INV'));
+        $this->assertEquals(2, $this->settings->get_next_sequential_number('INV'));
+        $this->assertEquals(1, $this->settings->get_next_sequential_number('CN'));
+
+        // Step 4: Switch to custom pattern
+        $this->settings->set_invoice_numbering_pattern('custom');
+        $this->settings->set_custom_numbering_pattern('INV-{year}-{order_id}');
+
+        $this->assertEquals('custom', $this->settings->get_invoice_numbering_pattern());
+        $this->assertEquals('INV-{year}-{order_id}', $this->settings->get_custom_numbering_pattern());
     }
 }
