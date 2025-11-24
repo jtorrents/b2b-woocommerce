@@ -1,6 +1,7 @@
 # Composer
 /vendor/
-composer.lock
+# composer.lock should be committed for WordPress plugins
+# Removed: ensures reproducible builds and consistent dependencies
 
 # WordPress
 .DS_Store
