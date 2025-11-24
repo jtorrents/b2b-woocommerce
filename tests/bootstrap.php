@@ -63,6 +63,23 @@ if (!function_exists('add_option')) {
     }
 }
 
+if (!function_exists('delete_option')) {
+    /**
+     * Mock delete_option function
+     *
+     * @param string $option Option name
+     * @return bool Success
+     */
+    function delete_option($option) {
+        global $wp_options;
+        if (isset($wp_options[$option])) {
+            unset($wp_options[$option]);
+            return true;
+        }
+        return false;
+    }
+}
+
 if (!function_exists('sanitize_text_field')) {
     /**
      * Mock sanitize_text_field function
@@ -679,6 +696,7 @@ if (!class_exists('WC_Order')) {
         public function set_billing_first_name($value) { $this->data['billing_first_name'] = $value; }
         public function set_billing_last_name($value) { $this->data['billing_last_name'] = $value; }
         public function set_billing_company($value) { $this->data['billing_company'] = $value; }
+        public function set_billing_country($value) { $this->data['billing_country'] = $value; }
         public function set_shipping_total($value) { $this->data['shipping_total'] = $value; }
         public function set_shipping_tax($value) { $this->data['shipping_tax'] = $value; }
 
@@ -768,6 +786,27 @@ if (!class_exists('WC_Order_Item_Product')) {
         public function set_quantity($qty) { $this->data['quantity'] = $qty; }
         public function set_total($total) { $this->data['total'] = $total; }
         public function set_taxes($taxes) { $this->data['taxes'] = $taxes; }
+        public function set_product($product) { $this->product = $product; }
+    }
+}
+
+// Mock WC_Product class
+if (!class_exists('WC_Product')) {
+    class WC_Product {
+        private $data = array();
+
+        public function __construct() {
+            $this->data = array(
+                'tax_status' => 'taxable',
+                'tax_class' => '',
+            );
+        }
+
+        public function get_tax_status() { return $this->data['tax_status']; }
+        public function get_tax_class() { return $this->data['tax_class']; }
+
+        public function set_tax_status($status) { $this->data['tax_status'] = $status; }
+        public function set_tax_class($class) { $this->data['tax_class'] = $class; }
     }
 }
 

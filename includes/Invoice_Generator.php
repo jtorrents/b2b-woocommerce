@@ -30,6 +30,42 @@ class Invoice_Generator {
     const RECTIFICATIVE_COUNTRIES = array('ES'); // Spain uses rectificative invoices
 
     /**
+     * EU member states (for intra-community supply detection)
+     *
+     * @since 1.0.0
+     * @var array
+     */
+    const EU_COUNTRIES = array(
+        'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR',
+        'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL',
+        'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE'
+    );
+
+    /**
+     * Tax names by country
+     *
+     * @since 1.0.0
+     * @var array
+     */
+    const TAX_NAMES = array(
+        'ES' => 'IVA',
+        'FR' => 'TVA',
+        'DE' => 'MwSt',
+        'IT' => 'IVA',
+        'PT' => 'IVA',
+        'NL' => 'BTW',
+        'BE' => 'TVA',
+        'AT' => 'USt',
+        'GB' => 'VAT',
+        'IE' => 'VAT',
+        'US' => 'Sales Tax',
+        'CA' => 'GST',
+        'AU' => 'GST',
+        'NZ' => 'GST',
+        'default' => 'VAT'
+    );
+
+    /**
      * Settings instance
      *
      * @since 1.0.0
@@ -332,17 +368,16 @@ class Invoice_Generator {
                 'price' => $price,
             );
 
-            // Add taxes if present
+            // Always add tax information (PEPPOL compliant)
             $tax_rate = $this->get_item_tax_rate($item, $item_order);
-            if ($tax_rate > 0) {
-                $line['taxes_attributes'] = array(
-                    array(
-                        'name' => 'IVA',
-                        'category' => 'S',  // Standard rate
-                        'percent' => abs($tax_rate),
-                    )
-                );
-            }
+            $tax_info = $this->get_peppol_tax_category($item, $item_order, $tax_rate);
+            $line['taxes_attributes'] = array(
+                array(
+                    'name' => $tax_info['name'],
+                    'category' => $tax_info['category'],
+                    'percent' => $tax_info['percent'],
+                )
+            );
 
             $invoice_lines[] = $line;
         }
@@ -369,11 +404,34 @@ class Invoice_Generator {
                 'price' => $shipping_price,
             );
 
+            // Always add tax information for shipping (PEPPOL compliant)
             $shipping_tax_rate = $this->get_shipping_tax_rate($item_order);
-            if ($shipping_tax_rate > 0) {
+            $merchant_country = $this->get_merchant_country();
+            $tax_name = $this->get_tax_name($merchant_country);
+
+            // Check for reverse charge
+            if ($this->is_reverse_charge($item_order)) {
                 $shipping_line['taxes_attributes'] = array(
                     array(
-                        'name' => 'IVA',
+                        'name' => $tax_name,
+                        'category' => 'AE',
+                        'percent' => 0.0,
+                    )
+                );
+            } elseif ($shipping_tax_rate == 0) {
+                // Exempt shipping (most common for zero-rate shipping)
+                $shipping_line['taxes_attributes'] = array(
+                    array(
+                        'name' => $tax_name,
+                        'category' => 'E',
+                        'percent' => 0.0,
+                    )
+                );
+            } else {
+                // Standard rate shipping
+                $shipping_line['taxes_attributes'] = array(
+                    array(
+                        'name' => $tax_name,
                         'category' => 'S',
                         'percent' => abs($shipping_tax_rate),
                     )
@@ -1236,5 +1294,158 @@ class Invoice_Generator {
         );
 
         return str_replace(array_keys($replacements), array_values($replacements), $pattern);
+    }
+
+    /**
+     * Get merchant (supplier) country from WooCommerce settings
+     *
+     * @since 1.0.0
+     * @return string Two-letter country code
+     */
+    private function get_merchant_country() {
+        $default_country = get_option('woocommerce_default_country', '');
+
+        // Format is "COUNTRY:STATE" or just "COUNTRY"
+        if (strpos($default_country, ':') !== false) {
+            list($country, $state) = explode(':', $default_country);
+            return strtoupper($country);
+        }
+
+        return strtoupper($default_country);
+    }
+
+    /**
+     * Get tax name based on country
+     *
+     * @since 1.0.0
+     * @param string $country_code Two-letter country code
+     * @return string Tax name (VAT, IVA, GST, etc.)
+     */
+    private function get_tax_name($country_code) {
+        $country_code = strtoupper($country_code);
+
+        if (isset(self::TAX_NAMES[$country_code])) {
+            return self::TAX_NAMES[$country_code];
+        }
+
+        return self::TAX_NAMES['default'];
+    }
+
+    /**
+     * Check if country is in the EU
+     *
+     * @since 1.0.0
+     * @param string $country_code Two-letter country code
+     * @return bool True if country is in EU
+     */
+    private function is_eu_country($country_code) {
+        return in_array(strtoupper($country_code), self::EU_COUNTRIES, true);
+    }
+
+    /**
+     * Detect if order qualifies for reverse charge (intra-EU B2B)
+     *
+     * @since 1.0.0
+     * @param \WC_Order|\WC_Order_Refund $order The order
+     * @return bool True if reverse charge applies
+     */
+    private function is_reverse_charge($order) {
+        // Get customer TIN
+        $tin = Customer_Fields::get_order_tin($order);
+
+        // For refunds, check parent order TIN if not on refund
+        if ($this->is_refund($order) && empty($tin)) {
+            $parent_order = wc_get_order($order->get_parent_id());
+            if ($parent_order) {
+                $tin = Customer_Fields::get_order_tin($parent_order);
+            }
+        }
+
+        // No TIN = not B2B = no reverse charge
+        if (empty($tin)) {
+            return false;
+        }
+
+        $merchant_country = $this->get_merchant_country();
+        $customer_country = $order->get_billing_country();
+
+        // Both must be in EU
+        if (!$this->is_eu_country($merchant_country) || !$this->is_eu_country($customer_country)) {
+            return false;
+        }
+
+        // Must be different countries
+        if ($merchant_country === $customer_country) {
+            return false;
+        }
+
+        // All conditions met: intra-EU B2B with different countries
+        return true;
+    }
+
+    /**
+     * Get PEPPOL tax category and details for an item
+     *
+     * @since 1.0.0
+     * @param \WC_Order_Item_Product $item The order item
+     * @param \WC_Order $order The order
+     * @param float $tax_rate The calculated tax rate percentage
+     * @return array{category: string, name: string, percent: float} Tax information
+     */
+    private function get_peppol_tax_category($item, $order, $tax_rate) {
+        $merchant_country = $this->get_merchant_country();
+        $tax_name = $this->get_tax_name($merchant_country);
+
+        // Check for reverse charge (AE)
+        if ($this->is_reverse_charge($order)) {
+            return array(
+                'category' => 'AE',
+                'name' => $tax_name,
+                'percent' => 0.0,
+            );
+        }
+
+        // Get product to check tax status
+        $product = $item->get_product();
+
+        if ($product) {
+            $tax_status = $product->get_tax_status();
+
+            // Product marked as non-taxable (Not Subject to tax)
+            if ($tax_status === 'none') {
+                return array(
+                    'category' => 'NS',
+                    'name' => $tax_name,
+                    'percent' => 0.0,
+                );
+            }
+
+            // Product is taxable, check if it's zero-rated
+            $tax_class = $product->get_tax_class();
+
+            if ($tax_rate == 0 && $tax_class === 'zero-rate') {
+                return array(
+                    'category' => 'Z',
+                    'name' => $tax_name,
+                    'percent' => 0.0,
+                );
+            }
+        }
+
+        // Tax rate is 0 but product is taxable (likely exempt)
+        if ($tax_rate == 0) {
+            return array(
+                'category' => 'E',
+                'name' => $tax_name,
+                'percent' => 0.0,
+            );
+        }
+
+        // Standard rate
+        return array(
+            'category' => 'S',
+            'name' => $tax_name,
+            'percent' => abs($tax_rate),
+        );
     }
 }

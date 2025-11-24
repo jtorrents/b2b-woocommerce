@@ -1100,4 +1100,529 @@ class InvoiceGeneratorTest extends TestCase {
         $this->assertEquals('S01-111', Invoice_Generator::format_invoice_number('111', 'S01'));
         $this->assertEquals('R01-222', Invoice_Generator::format_invoice_number('222', 'R01'));
     }
+
+    // ========== Tax Handling Tests (PEPPOL Compliance) ==========
+
+    /**
+     * Test get_merchant_country extracts country from WooCommerce settings
+     *
+     * @return void
+     */
+    public function test_get_merchant_country_extracts_from_settings() {
+        // Mock WooCommerce option
+        update_option('woocommerce_default_country', 'ES:B');
+
+        $reflection = new \ReflectionClass($this->generator);
+        $method = $reflection->getMethod('get_merchant_country');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->generator);
+
+        $this->assertEquals('ES', $result);
+
+        // Cleanup
+        delete_option('woocommerce_default_country');
+    }
+
+    /**
+     * Test get_merchant_country handles country without state
+     *
+     * @return void
+     */
+    public function test_get_merchant_country_handles_country_without_state() {
+        update_option('woocommerce_default_country', 'FR');
+
+        $reflection = new \ReflectionClass($this->generator);
+        $method = $reflection->getMethod('get_merchant_country');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->generator);
+
+        $this->assertEquals('FR', $result);
+
+        delete_option('woocommerce_default_country');
+    }
+
+    /**
+     * Test get_merchant_country returns uppercase
+     *
+     * @return void
+     */
+    public function test_get_merchant_country_returns_uppercase() {
+        update_option('woocommerce_default_country', 'de:BY');
+
+        $reflection = new \ReflectionClass($this->generator);
+        $method = $reflection->getMethod('get_merchant_country');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->generator);
+
+        $this->assertEquals('DE', $result);
+
+        delete_option('woocommerce_default_country');
+    }
+
+    /**
+     * Test get_tax_name returns correct name for Spain
+     *
+     * @return void
+     */
+    public function test_get_tax_name_returns_iva_for_spain() {
+        $reflection = new \ReflectionClass($this->generator);
+        $method = $reflection->getMethod('get_tax_name');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->generator, 'ES');
+
+        $this->assertEquals('IVA', $result);
+    }
+
+    /**
+     * Test get_tax_name returns correct name for various countries
+     *
+     * @return void
+     */
+    public function test_get_tax_name_returns_correct_names_for_countries() {
+        $reflection = new \ReflectionClass($this->generator);
+        $method = $reflection->getMethod('get_tax_name');
+        $method->setAccessible(true);
+
+        $this->assertEquals('TVA', $method->invoke($this->generator, 'FR'));
+        $this->assertEquals('MwSt', $method->invoke($this->generator, 'DE'));
+        $this->assertEquals('VAT', $method->invoke($this->generator, 'GB'));
+        $this->assertEquals('VAT', $method->invoke($this->generator, 'IE'));
+        $this->assertEquals('BTW', $method->invoke($this->generator, 'NL'));
+        $this->assertEquals('GST', $method->invoke($this->generator, 'CA'));
+        $this->assertEquals('Sales Tax', $method->invoke($this->generator, 'US'));
+    }
+
+    /**
+     * Test get_tax_name returns default VAT for unknown country
+     *
+     * @return void
+     */
+    public function test_get_tax_name_returns_default_for_unknown_country() {
+        $reflection = new \ReflectionClass($this->generator);
+        $method = $reflection->getMethod('get_tax_name');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->generator, 'XX');
+
+        $this->assertEquals('VAT', $result);
+    }
+
+    /**
+     * Test get_tax_name is case insensitive
+     *
+     * @return void
+     */
+    public function test_get_tax_name_is_case_insensitive() {
+        $reflection = new \ReflectionClass($this->generator);
+        $method = $reflection->getMethod('get_tax_name');
+        $method->setAccessible(true);
+
+        $this->assertEquals('IVA', $method->invoke($this->generator, 'es'));
+        $this->assertEquals('IVA', $method->invoke($this->generator, 'Es'));
+        $this->assertEquals('IVA', $method->invoke($this->generator, 'ES'));
+    }
+
+    /**
+     * Test is_eu_country returns true for EU countries
+     *
+     * @return void
+     */
+    public function test_is_eu_country_returns_true_for_eu_members() {
+        $reflection = new \ReflectionClass($this->generator);
+        $method = $reflection->getMethod('is_eu_country');
+        $method->setAccessible(true);
+
+        $eu_countries = ['ES', 'FR', 'DE', 'IT', 'NL', 'BE', 'PT', 'IE', 'AT', 'PL'];
+
+        foreach ($eu_countries as $country) {
+            $this->assertTrue(
+                $method->invoke($this->generator, $country),
+                "$country should be recognized as EU country"
+            );
+        }
+    }
+
+    /**
+     * Test is_eu_country returns false for non-EU countries
+     *
+     * @return void
+     */
+    public function test_is_eu_country_returns_false_for_non_eu() {
+        $reflection = new \ReflectionClass($this->generator);
+        $method = $reflection->getMethod('is_eu_country');
+        $method->setAccessible(true);
+
+        $non_eu_countries = ['US', 'GB', 'CH', 'NO', 'CA', 'AU'];
+
+        foreach ($non_eu_countries as $country) {
+            $this->assertFalse(
+                $method->invoke($this->generator, $country),
+                "$country should NOT be recognized as EU country"
+            );
+        }
+    }
+
+    /**
+     * Test is_eu_country is case insensitive
+     *
+     * @return void
+     */
+    public function test_is_eu_country_is_case_insensitive() {
+        $reflection = new \ReflectionClass($this->generator);
+        $method = $reflection->getMethod('is_eu_country');
+        $method->setAccessible(true);
+
+        $this->assertTrue($method->invoke($this->generator, 'es'));
+        $this->assertTrue($method->invoke($this->generator, 'Es'));
+        $this->assertTrue($method->invoke($this->generator, 'ES'));
+    }
+
+    /**
+     * Test is_reverse_charge returns false when no TIN
+     *
+     * @return void
+     */
+    public function test_is_reverse_charge_returns_false_without_tin() {
+        global $wc_mock_orders;
+
+        $order = new WC_Order(500);
+        $order->set_billing_country('FR');
+        $wc_mock_orders[500] = $order;
+
+        update_option('woocommerce_default_country', 'ES');
+
+        $reflection = new \ReflectionClass($this->generator);
+        $method = $reflection->getMethod('is_reverse_charge');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->generator, $order);
+
+        $this->assertFalse($result);
+
+        unset($wc_mock_orders[500]);
+        delete_option('woocommerce_default_country');
+    }
+
+    /**
+     * Test is_reverse_charge returns false for same country
+     *
+     * @return void
+     */
+    public function test_is_reverse_charge_returns_false_for_same_country() {
+        global $wc_mock_orders;
+
+        $order = new WC_Order(501);
+        $order->set_billing_country('ES');
+        $order->add_meta_data('_billing_tin', 'ESA12345678', true);
+        $wc_mock_orders[501] = $order;
+
+        update_option('woocommerce_default_country', 'ES');
+
+        $reflection = new \ReflectionClass($this->generator);
+        $method = $reflection->getMethod('is_reverse_charge');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->generator, $order);
+
+        $this->assertFalse($result);
+
+        unset($wc_mock_orders[501]);
+        delete_option('woocommerce_default_country');
+    }
+
+    /**
+     * Test is_reverse_charge returns true for intra-EU B2B
+     *
+     * @return void
+     */
+    public function test_is_reverse_charge_returns_true_for_intra_eu_b2b() {
+        global $wc_mock_orders;
+
+        $order = new WC_Order(502);
+        $order->set_billing_country('FR');
+        $order->add_meta_data('_billing_tin', 'FR12345678901', true);
+        $wc_mock_orders[502] = $order;
+
+        update_option('woocommerce_default_country', 'ES');
+
+        $reflection = new \ReflectionClass($this->generator);
+        $method = $reflection->getMethod('is_reverse_charge');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->generator, $order);
+
+        $this->assertTrue($result);
+
+        unset($wc_mock_orders[502]);
+        delete_option('woocommerce_default_country');
+    }
+
+    /**
+     * Test is_reverse_charge returns false for non-EU customer
+     *
+     * @return void
+     */
+    public function test_is_reverse_charge_returns_false_for_non_eu_customer() {
+        global $wc_mock_orders;
+
+        $order = new WC_Order(503);
+        $order->set_billing_country('US');
+        $order->add_meta_data('_billing_tin', 'US123456789', true);
+        $wc_mock_orders[503] = $order;
+
+        update_option('woocommerce_default_country', 'ES');
+
+        $reflection = new \ReflectionClass($this->generator);
+        $method = $reflection->getMethod('is_reverse_charge');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->generator, $order);
+
+        $this->assertFalse($result);
+
+        unset($wc_mock_orders[503]);
+        delete_option('woocommerce_default_country');
+    }
+
+    /**
+     * Test get_peppol_tax_category returns S for standard rate
+     *
+     * @return void
+     */
+    public function test_get_peppol_tax_category_returns_s_for_standard_rate() {
+        global $wc_mock_orders;
+
+        $order = new WC_Order(510);
+        $order->set_billing_country('ES');
+        $wc_mock_orders[510] = $order;
+
+        $item = new WC_Order_Item_Product('Product');
+        $product = new WC_Product();
+        $product->set_tax_status('taxable');
+        $item->set_product($product);
+
+        update_option('woocommerce_default_country', 'ES');
+
+        $reflection = new \ReflectionClass($this->generator);
+        $method = $reflection->getMethod('get_peppol_tax_category');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->generator, $item, $order, 21.0);
+
+        $this->assertEquals('S', $result['category']);
+        $this->assertEquals('IVA', $result['name']);
+        $this->assertEquals(21.0, $result['percent']);
+
+        unset($wc_mock_orders[510]);
+        delete_option('woocommerce_default_country');
+    }
+
+    /**
+     * Test get_peppol_tax_category returns E for exempt
+     *
+     * @return void
+     */
+    public function test_get_peppol_tax_category_returns_e_for_exempt() {
+        global $wc_mock_orders;
+
+        $order = new WC_Order(511);
+        $order->set_billing_country('ES');
+        $wc_mock_orders[511] = $order;
+
+        $item = new WC_Order_Item_Product('Product');
+        $product = new WC_Product();
+        $product->set_tax_status('taxable');
+        $product->set_tax_class('');
+        $item->set_product($product);
+
+        update_option('woocommerce_default_country', 'ES');
+
+        $reflection = new \ReflectionClass($this->generator);
+        $method = $reflection->getMethod('get_peppol_tax_category');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->generator, $item, $order, 0.0);
+
+        $this->assertEquals('E', $result['category']);
+        $this->assertEquals('IVA', $result['name']);
+        $this->assertEquals(0.0, $result['percent']);
+
+        unset($wc_mock_orders[511]);
+        delete_option('woocommerce_default_country');
+    }
+
+    /**
+     * Test get_peppol_tax_category returns Z for zero-rated
+     *
+     * @return void
+     */
+    public function test_get_peppol_tax_category_returns_z_for_zero_rated() {
+        global $wc_mock_orders;
+
+        $order = new WC_Order(512);
+        $order->set_billing_country('ES');
+        $wc_mock_orders[512] = $order;
+
+        $item = new WC_Order_Item_Product('Product');
+        $product = new WC_Product();
+        $product->set_tax_status('taxable');
+        $product->set_tax_class('zero-rate');
+        $item->set_product($product);
+
+        update_option('woocommerce_default_country', 'ES');
+
+        $reflection = new \ReflectionClass($this->generator);
+        $method = $reflection->getMethod('get_peppol_tax_category');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->generator, $item, $order, 0.0);
+
+        $this->assertEquals('Z', $result['category']);
+        $this->assertEquals('IVA', $result['name']);
+        $this->assertEquals(0.0, $result['percent']);
+
+        unset($wc_mock_orders[512]);
+        delete_option('woocommerce_default_country');
+    }
+
+    /**
+     * Test get_peppol_tax_category returns NS for non-taxable
+     *
+     * @return void
+     */
+    public function test_get_peppol_tax_category_returns_ns_for_non_taxable() {
+        global $wc_mock_orders;
+
+        $order = new WC_Order(513);
+        $order->set_billing_country('ES');
+        $wc_mock_orders[513] = $order;
+
+        $item = new WC_Order_Item_Product('Product');
+        $product = new WC_Product();
+        $product->set_tax_status('none');
+        $item->set_product($product);
+
+        update_option('woocommerce_default_country', 'ES');
+
+        $reflection = new \ReflectionClass($this->generator);
+        $method = $reflection->getMethod('get_peppol_tax_category');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->generator, $item, $order, 0.0);
+
+        $this->assertEquals('NS', $result['category']);
+        $this->assertEquals('IVA', $result['name']);
+        $this->assertEquals(0.0, $result['percent']);
+
+        unset($wc_mock_orders[513]);
+        delete_option('woocommerce_default_country');
+    }
+
+    /**
+     * Test get_peppol_tax_category returns AE for reverse charge
+     *
+     * @return void
+     */
+    public function test_get_peppol_tax_category_returns_ae_for_reverse_charge() {
+        global $wc_mock_orders;
+
+        $order = new WC_Order(514);
+        $order->set_billing_country('FR');
+        $order->add_meta_data('_billing_tin', 'FR12345678901', true);
+        $wc_mock_orders[514] = $order;
+
+        $item = new WC_Order_Item_Product('Product');
+        $product = new WC_Product();
+        $product->set_tax_status('taxable');
+        $item->set_product($product);
+
+        update_option('woocommerce_default_country', 'ES');
+
+        $reflection = new \ReflectionClass($this->generator);
+        $method = $reflection->getMethod('get_peppol_tax_category');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->generator, $item, $order, 0.0);
+
+        $this->assertEquals('AE', $result['category']);
+        $this->assertEquals('IVA', $result['name']);
+        $this->assertEquals(0.0, $result['percent']);
+
+        unset($wc_mock_orders[514]);
+        delete_option('woocommerce_default_country');
+    }
+
+    /**
+     * Test get_peppol_tax_category uses correct tax name per country
+     *
+     * @return void
+     */
+    public function test_get_peppol_tax_category_uses_correct_tax_name_per_country() {
+        global $wc_mock_orders;
+
+        // Test France with TVA
+        $order = new WC_Order(515);
+        $order->set_billing_country('FR');
+        $wc_mock_orders[515] = $order;
+
+        $item = new WC_Order_Item_Product('Product');
+        $product = new WC_Product();
+        $product->set_tax_status('taxable');
+        $item->set_product($product);
+
+        update_option('woocommerce_default_country', 'FR');
+
+        $reflection = new \ReflectionClass($this->generator);
+        $method = $reflection->getMethod('get_peppol_tax_category');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->generator, $item, $order, 20.0);
+
+        $this->assertEquals('TVA', $result['name']);
+        $this->assertEquals('S', $result['category']);
+
+        unset($wc_mock_orders[515]);
+        delete_option('woocommerce_default_country');
+    }
+
+    /**
+     * Test get_peppol_tax_category returns correct structure
+     *
+     * @return void
+     */
+    public function test_get_peppol_tax_category_returns_correct_structure() {
+        global $wc_mock_orders;
+
+        $order = new WC_Order(516);
+        $order->set_billing_country('ES');
+        $wc_mock_orders[516] = $order;
+
+        $item = new WC_Order_Item_Product('Product');
+        $product = new WC_Product();
+        $product->set_tax_status('taxable');
+        $item->set_product($product);
+
+        update_option('woocommerce_default_country', 'ES');
+
+        $reflection = new \ReflectionClass($this->generator);
+        $method = $reflection->getMethod('get_peppol_tax_category');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->generator, $item, $order, 21.0);
+
+        $this->assertIsArray($result);
+        $this->assertArrayHasKey('category', $result);
+        $this->assertArrayHasKey('name', $result);
+        $this->assertArrayHasKey('percent', $result);
+        $this->assertIsString($result['category']);
+        $this->assertIsString($result['name']);
+        $this->assertIsFloat($result['percent']);
+
+        unset($wc_mock_orders[516]);
+        delete_option('woocommerce_default_country');
+    }
 }
