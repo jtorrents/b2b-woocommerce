@@ -1,286 +1,356 @@
 # B2Brouter for WooCommerce
 
-Generate and send electronic invoices from WooCommerce orders using B2Brouter's eDocExchange service.
+**Automated invoice generation and tax compliance for WooCommerce using B2Brouter's eDocExchange service.**
 
-## Description
+B2Brouter for WooCommerce integrates your WooCommerce store with B2Brouter's electronic invoicing platform, providing structured data exchange, multi-country tax compliance, and API-driven invoice delivery for B2B and B2C eCommerce.
 
-B2Brouter for WooCommerce is a WordPress plugin that integrates your WooCommerce store with B2Brouter's electronic invoicing platform. Automatically generate compliant electronic invoices for your orders and send them to your customers through B2Brouter.
+[![Version](https://img.shields.io/badge/version-0.9.0-blue.svg)](https://github.com/B2Brouter/b2brouter-woocommerce/releases)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![WordPress](https://img.shields.io/badge/WordPress-5.8%2B-blue.svg)](https://wordpress.org)
+[![WooCommerce](https://img.shields.io/badge/WooCommerce-5.0%2B-purple.svg)](https://woocommerce.com)
 
-### Features
+---
 
-- **Automatic or Manual Invoice Generation**: Choose to generate invoices automatically when orders are completed, or manually from the order admin panel
-- **TIN/VAT Number Field**: Automatic TIN/VAT number collection at checkout for both classic and block-based checkout
-- **API Key Authentication**: Secure integration with B2Brouter using API keys
-- **Transaction Counter**: Track the total number of invoices generated
-- **Admin Bar Counter**: Quick view of invoice count directly in the WordPress admin bar
-- **Bulk Invoice Generation**: Generate invoices for multiple orders at once
-- **Order Integration**: View invoice status and details directly in WooCommerce orders
-- **B2Brouter PHP SDK**: Built on the official B2Brouter PHP SDK for reliable integration
+## Features
+
+### Invoice Generation
+
+- **Automatic or Manual Generation**: Configure the plugin to generate invoices automatically when orders are completed, or generate them manually from the order admin panel
+- **Bulk Invoice Generation**: Process multiple orders simultaneously using WooCommerce bulk actions
+- **Multiple Invoice Types**:
+  - **Standard Invoice (IssuedInvoice)**: For B2B transactions with customer TIN provided
+  - **Simplified Invoice (IssuedSimplifiedInvoice)**: For B2C transactions without TIN
+  - **Credit Notes**: Automatically generated for WooCommerce refunds, with support for country-specific formats (e.g., Spanish Rectificative Invoices)
+- **PDF Export**: Automatic generation and download of PDF invoices from B2Brouter
+- **Email Integration**: Attach PDF invoices to WooCommerce order completion and customer invoice emails
+- **Customer Downloads**: Customers can view and download invoices from their order pages
+
+### Tax Compliance
+
+- **Automatic Tax Category Detection**: Analyzes WooCommerce order data to determine appropriate tax categories for each line item
+- **PEPPOL Tax Categories**: Supports standard PEPPOL categories:
+  - **S** (Standard rate): Applied when taxes exist
+  - **E** (Exempt from tax): Taxable items with 0% rate
+  - **Z** (Zero-rated goods): Items with explicit zero-rate tax class
+  - **NS** (Not subject to tax): Non-taxable items (B2Brouter maps to PEPPOL G or O based on context)
+  - **AE** (VAT Reverse Charge): Automatically detected for intra-EU B2B transactions
+- **Intra-EU Reverse Charge**: Automatic detection based on customer TIN and country comparison
+- **Dynamic Tax Names**: Tax names automatically localized by supplier country (IVA, TVA, VAT, MwSt, GST, etc.)
+- **Merchant Country Detection**: Automatically extracts merchant country from WooCommerce settings
+- **EU Country Detection**: Built-in detection of 27 EU member states for compliance logic
+
+### Custom Invoice Numbering
+
+- **Series Codes**: Configure different prefixes for invoices and credit notes (e.g., INV, CN)
+- **Multiple Numbering Patterns**:
+  - **Automatic**: B2Brouter generates sequential numbers
+  - **WooCommerce Order Number**: Use WooCommerce's native order numbering
+  - **Sequential**: Independent sequential counter per series code
+  - **Custom Pattern**: Define patterns using placeholders:
+    - `{order_id}`: WooCommerce order ID
+    - `{order_number}`: WooCommerce order number
+    - `{year}`: Current year (YYYY)
+    - `{month}`: Current month (MM)
+    - `{day}`: Current day (DD)
+
+### TIN/VAT Number Collection
+
+- **Checkout Integration**: Automatic TIN/VAT field added to WooCommerce checkout
+- **Block Checkout Support**: Compatible with WooCommerce 8.6+ block-based checkout
+- **Classic Checkout Support**: Works with traditional shortcode-based checkout
+- **Customer Profile Storage**: TIN saved to customer profile for reuse on subsequent orders
+- **Order Meta Storage**: TIN stored as `_billing_tin` order metadata
+- **Admin Visibility**: TIN displayed in order billing information in admin
+
+### PDF Management
+
+- **Local Caching**: Store generated PDFs in WordPress upload directory for fast access
+- **Automatic Cleanup**: Scheduled cleanup of old PDF files using WordPress cron
+- **Configurable Retention**: Set retention period (default: 90 days)
+- **On-Demand Download**: Manual download trigger with automatic caching
+- **Force Regeneration**: Option to force PDF regeneration and update cache
+
+### Admin Interface
+
+- **Settings Panel**: Dedicated settings page under B2Brouter menu with API key validation
+- **Order Meta Box**: Invoice status and generation controls in WooCommerce order edit page
+- **Invoice Column**: Visual invoice status indicator in WooCommerce orders list
+- **Bulk Actions**: Invoice generation available in WooCommerce orders bulk actions menu
+- **Admin Bar Counter**: Transaction count displayed in WordPress admin bar
+- **Order Notes**: Automatic order notes added on invoice generation success/failure
+- **Error Handling**: Clear error messages with detailed logging for troubleshooting
+
+### WooCommerce Integration
+
+- **HPOS Compatibility**: Native support for WooCommerce High-Performance Order Storage (Custom Order Tables)
+- **Order Status Hooks**: Automatic invoice generation triggered on order completion
+- **Meta Data Storage**: Invoice ID, number, and date stored as order metadata
+- **Refund Integration**: WooCommerce refunds automatically generate credit notes
+- **Currency Support**: Respects WooCommerce order currency for multi-currency stores
+- **Tax Calculation Integration**: Reads WooCommerce tax data to calculate and categorize taxes
+
+### API Integration
+
+- **B2Brouter PHP SDK**: Built on official B2Brouter PHP SDK (v0.9.1+)
+- **Environment Support**:
+  - Staging: `https://api-staging.b2brouter.net`
+  - Production: `https://api.b2brouter.net`
+- **API Key Validation**: Real-time validation with account information retrieval
+- **Structured Data Exchange**: Sends structured invoice data (not just PDFs)
+- **Electronic Invoice Formats**: Supports UBL, Facturae, and other formats via B2Brouter
+- **Multi-Country Compliance**: B2Brouter adapts invoice requirements for PEPPOL and non-PEPPOL countries
+
+---
 
 ## Requirements
 
 - WordPress 5.8 or higher
 - WooCommerce 5.0 or higher
 - PHP 7.4 or higher
-- Composer (for dependency management)
+- Composer (for development only)
 - Active B2Brouter eDocExchange subscription
+
+---
 
 ## Installation
 
-### For End Users (Recommended)
+### End Users
 
-**Download the pre-built release ZIP** (includes all dependencies):
+1. Download the release ZIP file from the [releases page](https://github.com/B2Brouter/b2brouter-woocommerce/releases)
+2. In WordPress Admin, navigate to **Plugins → Add New → Upload Plugin**
+3. Select the downloaded ZIP file
+4. Click **Install Now**, then **Activate Plugin**
+5. Configure API key in **B2Brouter → Settings**
 
-1. Download `b2brouter-woocommerce-X.X.X.zip` from the releases page
-2. In WordPress Admin, go to **Plugins → Add New → Upload Plugin**
-3. Choose the downloaded ZIP file
-4. Click **Install Now** → **Activate Plugin**
-5. Follow the welcome screen to configure your B2Brouter API key
+The release ZIP includes all dependencies. Composer is not required.
 
-**No Composer required!** The release ZIP includes all dependencies.
-
-### For Developers
-
-If you're developing or contributing to the plugin:
+### Developers
 
 ```bash
 # Clone repository
 git clone https://github.com/B2Brouter/b2brouter-woocommerce.git
 cd b2brouter-woocommerce
 
-# Install dependencies via Composer
+# Install dependencies
 composer install
 
 # Link to WordPress plugins directory
 ln -s $(pwd) /path/to/wordpress/wp-content/plugins/b2brouter-woocommerce
 ```
 
-**Note:** The `vendor/` directory is gitignored for development. For distribution, use the build script:
+Build distribution package:
 
 ```bash
 ./build-release.sh
-# Creates: dist/b2brouter-woocommerce-X.X.X.zip (ready for distribution)
+# Output: build/b2brouter-woocommerce-X.X.X.zip
 ```
 
-See [DISTRIBUTION.md](DISTRIBUTION.md) for complete release instructions.
+See [DISTRIBUTION.md](DISTRIBUTION.md) for release procedures.
+
+---
 
 ## Configuration
 
-### 1. Get Your API Key
+### API Setup
 
-1. Visit [B2Brouter](https://app.b2brouter.net)
-2. If you're a new user, complete the registration process
-3. If you're an existing user, log in to your account
-4. Activate your eDocExchange subscription
-5. Copy your API key
+1. Navigate to **B2Brouter → Settings** in WordPress admin
+2. Enter your B2Brouter API key
+3. Click **Validate Key** to verify connectivity and retrieve account information
+4. Select environment (Staging or Production)
+5. Save settings
 
-### 2. Configure the Plugin
+### Invoice Generation
 
-1. Go to **B2Brouter** → **Settings** in WordPress admin
-2. Paste your API key in the **API Key** field
-3. Click **Validate Key** to verify the connection
-4. Choose your **Invoice Generation Mode**:
-   - **Automatic**: Invoices are generated automatically when orders are completed
-   - **Manual**: Invoices are generated manually using a button in the order admin
-5. Click **Save Settings**
+**Invoice Mode**:
+- **Automatic**: Invoices generated when orders transition to "Completed" status
+- **Manual**: Invoices generated on-demand from order admin page
+
+### PDF Settings
+
+**Auto-Save PDFs**:
+- Enable to automatically download and cache PDFs locally in WordPress
+- Improves response time for customer downloads
+- Reduces API calls to B2Brouter
+
+**Email Attachments**:
+- **Attach to Order Completed Email**: Include PDF in WooCommerce order completion emails
+- **Attach to Customer Invoice Email**: Include PDF in WooCommerce customer invoice emails
+
+**Automatic Cleanup**:
+- Enable scheduled cleanup of cached PDF files
+- Configure retention period (days)
+- Cleanup runs daily via WordPress cron
+
+### Invoice Numbering
+
+**Series Codes**:
+- **Invoice Series Code**: Prefix for regular invoices (e.g., "INV")
+- **Credit Note Series Code**: Prefix for credit notes (e.g., "CN")
+
+**Numbering Pattern**:
+- **Automatic**: B2Brouter generates sequential numbers
+- **WooCommerce Order Number**: Use WooCommerce order number as invoice number
+- **Sequential**: Plugin maintains independent sequential counter per series
+- **Custom Pattern**: Define custom format using placeholders
+
+Example patterns:
+- `INV-{year}-{order_id}` → `INV-2025-123`
+- `{order_number}` → `1234`
+- Sequential → `00001`, `00002`, `00003`
+
+---
 
 ## Usage
 
-### Automatic Mode
+### Automatic Invoice Generation
 
-When automatic mode is enabled:
+With automatic mode enabled:
 
-1. Customer completes a purchase
+1. Customer completes purchase
 2. Order status changes to "Completed"
-3. Invoice is automatically generated and sent via B2Brouter
-4. Order note is added with invoice details
+3. Plugin generates invoice via B2Brouter API
+4. Invoice metadata saved to order
+5. Order note added with invoice details
+6. PDF generated and cached (if auto-save enabled)
+7. Email sent with PDF attachment (if configured)
 
-### Manual Mode
+### Manual Invoice Generation
 
-When manual mode is enabled:
+Single order:
 
-1. Go to **WooCommerce** → **Orders**
-2. Click on an order to view details
-3. In the **B2Brouter Invoice** meta box, click **Generate Invoice**
-4. Invoice is created and sent via B2Brouter
-5. Meta box updates to show invoice details
+1. Navigate to **WooCommerce → Orders**
+2. Open order detail page
+3. Locate **B2Brouter Invoice** meta box
+4. Click **Generate Invoice**
+5. View invoice details and download PDF
 
-### Bulk Invoice Generation
+Bulk generation:
 
-1. Go to **WooCommerce** → **Orders**
-2. Select multiple orders using checkboxes
-3. From **Bulk Actions** dropdown, select **Generate B2Brouter Invoices**
+1. Navigate to **WooCommerce → Orders**
+2. Select multiple completed orders
+3. Choose **Generate B2Brouter Invoices** from bulk actions dropdown
 4. Click **Apply**
-5. Invoices are generated for all selected orders
+5. View results in admin notice
 
-### View Invoice Status
+### Tax Configuration
 
-- **Orders List**: A checkmark icon appears in the **Invoice** column for orders with invoices
-- **Order Details**: View full invoice details in the **B2Brouter Invoice** meta box
-- **Admin Bar**: View total invoice count in the WordPress admin bar
+The plugin reads tax configuration from WooCommerce:
 
-## Advanced Configuration
+1. Navigate to **WooCommerce → Settings → Tax**
+2. Enable "Enable tax rates and calculations"
+3. Configure standard rates:
+   - Country code
+   - Tax rate percentage
+   - Tax name (e.g., IVA, VAT)
+   - Shipping tax setting
 
-Advanced settings like transports, formats, taxes, and compliance rules are configured in your B2Brouter account, not in the WordPress plugin.
+**Zero-Rate Products**:
+- Create tax class named "Zero Rate"
+- Set tax rate to 0%
+- Assign to products
+- Plugin uses PEPPOL category Z
 
-To access advanced settings:
+**Non-Taxable Products**:
+- Set product **Tax Status** to "None"
+- Plugin uses category NS (Not Subject)
 
-1. Click **Access B2Brouter Account Settings** in the plugin settings page
-2. Or visit [B2Brouter Account](https://app.b2brouter.net) directly
+### Customer TIN Collection
 
-## TIN/VAT Number Collection
+TIN field automatically appears in checkout. Customer can optionally provide:
 
-The plugin automatically adds a TIN/VAT Number field to your WooCommerce checkout to collect tax identification numbers from customers.
+- Tax ID / VAT Number in checkout form
+- Value saved to `_billing_tin` order meta
+- Value saved to customer profile for reuse
+- Included automatically in invoice data
 
-### Supported Checkout Types
+For intra-EU B2B transactions with TIN, reverse charge (AE category) is automatically applied.
 
-- **Block Checkout** (WooCommerce 8.6+): Field appears in the contact information section
-- **Classic Checkout** (Shortcode-based): Field appears in the billing section after company name
+---
 
-### Field Details
+## Architecture
 
-- **Label**: "Tax ID / VAT Number"
-- **Type**: Text field (optional)
-- **Location**: Contact section (block checkout) or Billing section (classic checkout)
-- **Storage**: Saved as `_billing_tin` order meta
-- **Admin**: Visible in order edit screen under billing information
+For detailed technical architecture documentation including class structure, data flow, and API integration, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-### How It Works
+---
 
-1. Customer enters their TIN/VAT number during checkout
-2. Value is saved to the order as `_billing_tin` meta
-3. TIN is displayed in the admin order view
-4. TIN is automatically included in B2Brouter invoices
+## Testing
 
-**Note**: The field is optional by default. Customers can complete checkout without entering a TIN/VAT number.
-
-## Invoice Data
-
-The plugin automatically includes the following data in invoices:
-
-- Customer name and email
-- Billing address (street, city, postal code, country)
-- Company name (if provided)
-- **Tax ID / VAT Number** (collected at checkout via the TIN field)
-- Order line items with quantities, prices, and tax rates
-- Shipping costs (if applicable)
-- Order currency
-- WooCommerce order ID and order number (in metadata)
-
-## Troubleshooting
-
-### Invoice Generation Fails
-
-- Verify your API key is valid using the **Validate Key** button
-- Check that your eDocExchange subscription is active
-- Review order notes for specific error messages
-- Ensure all required customer information is present in the order
-
-### API Key Validation Fails
-
-- Check that you copied the complete API key
-- Verify your eDocExchange subscription is active
-- Ensure your WordPress site can connect to B2Brouter servers (no firewall blocking)
-
-### Missing Invoice in Order
-
-- Check that automatic mode is enabled (if expecting automatic generation)
-- Verify the order status is "Completed"
-- Check if an invoice already exists (invoices can only be generated once per order)
-- Review order notes for any error messages
-
-### Composer Dependencies Not Found
+### Running Tests
 
 ```bash
-cd /path/to/wp-content/plugins/b2brouter-woocommerce
+# Install dev dependencies
 composer install
+
+# Run test suite
+composer test
+# or
+./vendor/bin/phpunit
+
+# Run specific test file
+./vendor/bin/phpunit tests/InvoiceGeneratorTest.php
+
+# Generate coverage report
+composer test:coverage
+# Opens tests/coverage/index.html
 ```
+
+### Test Coverage
+
+Current coverage: 61.38% (1038/1691 lines)
+
+Coverage by class:
+- Settings: 72.57%
+- Customer_Fields: 74.07%
+- Admin: 69.80%
+- Order_Handler: 64.61%
+- Invoice_Generator: 61.29%
+
+### Test Environment
+
+Tests use mocked WordPress and WooCommerce functions (see `tests/bootstrap.php`). No WordPress installation required for testing.
+
+Mocked components:
+- WordPress core functions (`get_option`, `update_option`, etc.)
+- WooCommerce classes (`WC_Order`, `WC_Product`, etc.)
+- B2Brouter API client (returns simulated responses)
+
+---
 
 ## Development
 
-### File Structure
+For comprehensive development documentation including IDE setup, release process, and contribution guidelines, see [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md).
 
-```
-b2brouter-woocommerce/
-├── assets/
-│   ├── css/
-│   │   └── admin.css           # Admin styles
-│   └── js/
-│       └── admin.js            # Admin JavaScript
-├── includes/
-│   ├── class-b2brouter-settings.php        # Settings handler
-│   ├── class-b2brouter-admin.php           # Admin interface
-│   ├── class-b2brouter-invoice-generator.php  # Invoice generation logic
-│   └── class-b2brouter-order-handler.php   # WooCommerce order integration
-├── vendor/                     # Composer dependencies (not in repo)
-├── b2brouter-woocommerce.php   # Main plugin file
-├── composer.json               # Composer configuration
-└── README.md                   # This file
-```
-
-### Hooks and Filters
-
-The plugin provides hooks for developers:
-
-#### Actions
-
-- `woocommerce_order_status_completed` - Automatic invoice generation
-- `add_meta_boxes` - Invoice meta box registration
-- `admin_bar_menu` - Admin bar counter
-
-#### Filters
-
-- `manage_edit-shop_order_columns` - Add invoice column to orders list
-- `bulk_actions-edit-shop_order` - Add bulk action for invoice generation
-- `plugin_action_links_{basename}` - Add settings link to plugins page
-
-### B2Brouter PHP SDK Integration
-
-The plugin uses the official [B2Brouter PHP SDK](https://github.com/B2Brouter/b2brouter-php) (v0.9.0+) for all API interactions.
-
-**SDK Information:**
-- **Packagist:** https://packagist.org/packages/b2brouter/b2brouter-php
-- **GitHub:** https://github.com/B2Brouter/b2brouter-php
-- **Version:** ^0.9.0
-- **License:** MIT
-
-**Environment Configuration:**
-- **Default:** Staging (`https://api-staging.b2brouter.net`)
-- **Production:** `https://api.b2brouter.net` (configurable in settings)
-
-Key methods used:
-
-```php
-// Initialize client with environment-specific API base URL
-$api_base = $this->settings->get_api_base_url(); // Returns staging or production URL
-$client = new \B2BRouter\B2BRouterClient($api_key, ['api_base' => $api_base]);
-
-// Create invoice
-$invoice = $client->invoices->create($account_id, ['invoice' => $invoice_data]);
-
-// Send invoice
-$client->invoices->send($invoice['id']);
-
-// Validate API key and get accounts
-$accounts = $client->accounts->all(['limit' => 1]);
-```
+---
 
 ## Support
 
 - **Documentation**: [B2Brouter API Documentation](https://developer.b2brouter.net)
-- **B2Brouter**: [B2Brouter](https://app.b2brouter.net)
-- **GitHub Issues**: [Report Issues](https://github.com/jtorrents/b2b-woocommerce/issues)
+- **B2Brouter Platform**: [app.b2brouter.net](https://app.b2brouter.net)
+- **GitHub Issues**: [github.com/B2Brouter/b2brouter-woocommerce/issues](https://github.com/B2Brouter/b2brouter-woocommerce/issues)
 
-## License
-
-This library is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
-## Credits
-
-- Developed by [B2Brouter](https://b2brouter.net)
-- Uses the [B2Brouter PHP SDK](https://github.com/jtorrents/b2b-php)
-- Built for [WooCommerce](https://woocommerce.com)
+---
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome. Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Add tests for new functionality
+4. Ensure tests pass: `composer test`
+5. Follow WordPress Coding Standards
+6. Submit pull request with clear description
+
+---
+
+## License
+
+MIT License. See [LICENSE](LICENSE) file for details.
+
+---
+
+## Credits
+
+- **Developed by**: B2Brouter
+- **B2Brouter PHP SDK**: [github.com/B2Brouter/b2brouter-php](https://github.com/B2Brouter/b2brouter-php)
+- **Built for**: [WooCommerce](https://woocommerce.com) and [WordPress](https://wordpress.org)

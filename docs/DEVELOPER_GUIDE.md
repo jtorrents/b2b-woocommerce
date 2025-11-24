@@ -845,4 +845,45 @@ unzip -t dist/b2brouter-woocommerce-*.zip
 
 ---
 
+## IDE Setup
+
+For proper autocomplete and type hints, install WordPress and WooCommerce stubs:
+
+```bash
+composer require --dev php-stubs/wordpress-stubs php-stubs/woocommerce-stubs
+```
+
+Configuration file `.phpactor.json` is included for Neovim/PhpStorm/VSCode.
+
+See [IDE_SETUP.md](../IDE_SETUP.md) for detailed configuration instructions.
+
+---
+
+## Hooks and Extension Points
+
+### Actions
+
+```php
+// Triggered after successful invoice generation
+do_action('b2brouter_invoice_generated', $order_id, $invoice_data);
+
+// Triggered after PDF is saved
+do_action('b2brouter_pdf_saved', $order_id, $pdf_path);
+```
+
+### Filters
+
+```php
+// Modify invoice data before API submission
+apply_filters('b2brouter_invoice_data', $invoice_data, $order);
+
+// Customize invoice number format
+apply_filters('b2brouter_invoice_number', $invoice_number, $order);
+
+// Modify PDF storage path
+apply_filters('b2brouter_pdf_storage_path', $path, $order_id);
+```
+
+---
+
 **Questions?** Check the troubleshooting section or open an issue on GitHub.
